@@ -1,0 +1,158 @@
+name: Claude Code Update Tracker
+
+on:
+  schedule:
+    - cron: '0 9 */2 * *'  # 2일마다 오전 9시 (UTC 기준, 한국 오후 6시)
+  workflow_dispatch:        # 수동 실행 가능
+
+jobs:
+  check-updates:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - name: Fetch Claude Code releases
+        id: fetch_releases
+        run: |
+          # 최신 릴리즈 5개 가져오기
+          RELEASES=$(curl -s \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/anthropics/claude-code/releases?per_page=5")
+          
+          echo "releases<<EOF" >> $GITHUB_OUTPUT
+          echo "$RELEASES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Check latest version and existing issues
+        id: check_version
+        run: |
+          RELEASES='${{ steps.fetch_releases.outputs.releases }}'
+          LATEST_TAG=$(echo "$RELEASES" | jq -r '.[0].tag_name // "unknown"')
+          LATEST_BODY=$(echo "$RELEASES" | jq -r '.[0].body // ""')
+          LATEST_DATE=$(echo "$RELEASES" | jq -r '.[0].published_at // ""')
+          
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "latest_date=$LATEST_DATE" >> $GITHUB_OUTPUT
+          
+          # release body를 파일에 저장 (특수문자 이슈 방지)
+          echo "$LATEST_BODY" > /tmp/release_body.txt
+          echo "$RELEASES" > /tmp/releases.json
+
+      - name: Check for duplicate issue
+        id: check_duplicate
+        run: |
+          LATEST_TAG="${{ steps.check_version.outputs.latest_tag }}"
+          
+          # 기존 이슈에서 같은 버전 태그가 있는지 확인
+          EXISTING=$(curl -s \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/issues?state=all&labels=claude-code-update&per_page=50" \
+            | jq -r --arg tag "$LATEST_TAG" '[.[] | select(.title | contains($tag))] | length')
+          
+          if [ "$EXISTING" -gt "0" ]; then
+            echo "duplicate=true" >> $GITHUB_OUTPUT
+            echo "⏭️ $LATEST_TAG 이슈가 이미 존재합니다. 스킵합니다."
+          else
+            echo "duplicate=false" >> $GITHUB_OUTPUT
+            echo "✅ 새로운 버전 $LATEST_TAG 감지. 분석을 진행합니다."
+          fi
+
+      - name: Analyze with GPT-4o
+        id: analyze
+        if: steps.check_duplicate.outputs.duplicate == 'false'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          RELEASE_BODY=$(cat /tmp/release_body.txt)
+          LATEST_TAG="${{ steps.check_version.outputs.latest_tag }}"
+          
+          # GPT-4o에게 분석 요청
+          RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -d "$(jq -n \
+              --arg tag "$LATEST_TAG" \
+              --arg body "$RELEASE_BODY" \
+              '{
+                model: "gpt-4o",
+                max_tokens: 1500,
+                messages: [
+                  {
+                    role: "system",
+                    content: "당신은 Claude Code (Anthropic의 AI 코딩 도구) 업데이트를 분석하는 전문가입니다. 릴리즈 노트를 분석해서 개발자가 알아야 할 중요한 내용을 정리해주세요."
+                  },
+                  {
+                    role: "user",
+                    content: ("Claude Code 버전 " + $tag + " 릴리즈 노트를 분석해주세요.\n\n릴리즈 노트:\n" + $body + "\n\n다음 형식으로 JSON만 반환해주세요 (다른 텍스트 없이):\n{\n  \"should_create_issue\": true or false,\n  \"categories\": [\"새 버전 릴리즈\", \"새 기능 추가\", \"Breaking change\", \"보안 관련\"] 중 해당하는 것들,\n  \"summary\": \"한국어로 2-3줄 요약\",\n  \"breaking_changes\": \"Breaking change가 있으면 설명, 없으면 null\",\n  \"new_features\": [\"새 기능 목록\"],\n  \"security\": \"보안 관련 내용이 있으면 설명, 없으면 null\",\n  \"action_required\": \"개발자가 취해야 할 액션이 있으면 설명, 없으면 null\"\n}")
+                  }
+                ]
+              }')")
+          
+          ANALYSIS=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+          
+          echo "analysis<<EOF" >> $GITHUB_OUTPUT
+          echo "$ANALYSIS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # should_create_issue 추출
+          SHOULD_CREATE=$(echo "$ANALYSIS" | jq -r '.should_create_issue // false')
+          echo "should_create=$SHOULD_CREATE" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Issue
+        if: |
+          steps.check_duplicate.outputs.duplicate == 'false' &&
+          steps.analyze.outputs.should_create == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LATEST_TAG="${{ steps.check_version.outputs.latest_tag }}"
+          LATEST_DATE="${{ steps.check_version.outputs.latest_date }}"
+          ANALYSIS='${{ steps.analyze.outputs.analysis }}'
+          
+          SUMMARY=$(echo "$ANALYSIS" | jq -r '.summary // "분석 결과 없음"')
+          BREAKING=$(echo "$ANALYSIS" | jq -r '.breaking_changes // "없음"')
+          FEATURES=$(echo "$ANALYSIS" | jq -r '.new_features // [] | if type == "array" then map("- " + .) | join("\n") else . end')
+          SECURITY=$(echo "$ANALYSIS" | jq -r '.security // "없음"')
+          ACTION=$(echo "$ANALYSIS" | jq -r '.action_required // "없음"')
+          CATEGORIES=$(echo "$ANALYSIS" | jq -r '.categories // [] | join(", ")')
+          
+          RELEASE_DATE=$(echo "$LATEST_DATE" | cut -c1-10)
+          
+          ISSUE_BODY="## 📦 Claude Code ${LATEST_TAG} 업데이트
+
+          > 릴리즈 날짜: ${RELEASE_DATE} | 카테고리: ${CATEGORIES}
+
+          ### 요약
+          ${SUMMARY}
+
+          ### ⚠️ Breaking Changes
+          ${BREAKING}
+
+          ### ✨ 새로운 기능
+          ${FEATURES:-없음}
+
+          ### 🔒 보안
+          ${SECURITY}
+
+          ### 🚀 필요한 액션
+          ${ACTION}
+
+          ---
+          🔗 [공식 릴리즈 노트](https://github.com/anthropics/claude-code/releases/tag/${LATEST_TAG})
+          🤖 *이 이슈는 GitHub Actions가 자동 생성했습니다.*"
+          
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "🤖 Claude Code ${LATEST_TAG} 업데이트 알림" \
+            --body "$ISSUE_BODY" \
+            --label "claude-code-update"
+
+      - name: Skip log
+        if: |
+          steps.check_duplicate.outputs.duplicate == 'false' &&
+          steps.analyze.outputs.should_create == 'false'
+        run: |
+          echo "💤 GPT-4o 판단: 이번 업데이트는 이슈 생성 기준에 해당하지 않습니다."
+          echo "버전: ${{ steps.check_version.outputs.latest_tag }}"
