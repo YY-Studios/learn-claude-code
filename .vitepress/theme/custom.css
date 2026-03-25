@@ -1,0 +1,328 @@
+/* ── 폰트 ── */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+/* ── 컬러 변수 오버라이드 ── */
+:root {
+  --vp-c-brand-1:        #34a853;
+  --vp-c-brand-2:        #2d9348;
+  --vp-c-brand-3:        #e8f5ec;
+  --vp-c-brand-soft:     #e8f5ec;
+
+  --vp-c-bg:             #ffffff;
+  --vp-c-bg-soft:        #f5f5f7;
+  --vp-c-bg-mute:        #ebebed;
+
+  --vp-c-divider:        #e8e8ed;
+  --vp-c-text-1:         #1d1d1f;
+  --vp-c-text-2:         #6e6e73;
+  --vp-c-text-3:         #aeaeb2;
+
+  --vp-c-default-soft:   #f5f5f7;
+
+  /* 폰트 */
+  --vp-font-family-base: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  --vp-font-family-mono: 'IBM Plex Mono', 'Menlo', monospace;
+
+  /* 레이아웃 */
+  --vp-layout-max-width: 1280px;
+
+  /* 버튼 */
+  --vp-button-brand-bg:          #34a853;
+  --vp-button-brand-hover-bg:    #2d9348;
+  --vp-button-brand-active-bg:   #256e3a;
+  --vp-button-brand-border:      transparent;
+  --vp-button-brand-hover-border: transparent;
+  --vp-button-brand-text:        #ffffff;
+  --vp-button-brand-hover-text:  #ffffff;
+
+  /* 코드블록 */
+  --vp-code-block-bg:    #1d1d1f;
+  --vp-code-color:       #34a853;
+  --vp-code-bg:          #f0faf3;
+}
+
+/* 다크모드 */
+.dark {
+  --vp-c-bg:           #141414;
+  --vp-c-bg-soft:      #1a1a1a;
+  --vp-c-bg-mute:      #222222;
+  --vp-c-divider:      #2a2a2a;
+  --vp-c-text-1:       #e8e8e8;
+  --vp-c-text-2:       #888888;
+  --vp-c-text-3:       #555555;
+  --vp-code-bg:        rgba(52,168,83,0.1);
+}
+
+/* ── 전체 폰트 스무딩 ── */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── 네비게이션 ── */
+.VPNav {
+  border-bottom: 1px solid var(--vp-c-divider) !important;
+  backdrop-filter: saturate(180%) blur(20px);
+  background: rgba(255,255,255,0.85) !important;
+}
+
+.dark .VPNav {
+  background: rgba(20,20,20,0.85) !important;
+}
+
+.VPNavBar .title {
+  font-family: 'IBM Plex Mono', monospace !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.01em;
+}
+
+/* ── 사이드바 ── */
+.VPSidebar {
+  background: var(--vp-c-bg-soft) !important;
+  border-right: 1px solid var(--vp-c-divider) !important;
+}
+
+.VPSidebarItem .text {
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  color: var(--vp-c-text-2) !important;
+  transition: color 0.12s;
+}
+
+.VPSidebarItem.is-active > .item .text {
+  color: var(--vp-c-brand-1) !important;
+  font-weight: 500 !important;
+}
+
+.VPSidebarItem .indicator {
+  background: var(--vp-c-brand-1) !important;
+}
+
+/* 사이드바 섹션 라벨 */
+.VPSidebarItem.level-0 > .item .text {
+  font-family: 'IBM Plex Mono', monospace !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: var(--vp-c-text-3) !important;
+}
+
+/* ── 홈 히어로 ── */
+.VPHero .name {
+  font-size: 52px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.08 !important;
+}
+
+.VPHero .name .clip {
+  background: linear-gradient(135deg, #34a853, #2d9348) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+.VPHero .text {
+  font-size: 52px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.08 !important;
+  color: var(--vp-c-text-1) !important;
+}
+
+.VPHero .tagline {
+  font-size: 16px !important;
+  font-weight: 300 !important;
+  color: var(--vp-c-text-2) !important;
+  line-height: 1.65 !important;
+  max-width: 500px;
+}
+
+/* 히어로 버튼 */
+.VPButton.brand {
+  border-radius: 980px !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  padding: 10px 22px !important;
+  transition: all 0.2s !important;
+}
+
+.VPButton.brand:hover {
+  box-shadow: 0 4px 16px rgba(52,168,83,0.3) !important;
+  transform: translateY(-1px);
+}
+
+.VPButton.alt {
+  border-radius: 980px !important;
+  font-size: 13px !important;
+  padding: 10px 22px !important;
+  border-color: var(--vp-c-divider) !important;
+}
+
+/* ── 홈 features ── */
+.VPFeature {
+  border-radius: 12px !important;
+  border: 1px solid var(--vp-c-divider) !important;
+  background: var(--vp-c-bg) !important;
+  transition: all 0.18s !important;
+  padding: 20px 24px !important;
+}
+
+.VPFeature:hover {
+  border-color: #c3e6cc !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.07) !important;
+  transform: translateY(-2px);
+}
+
+.VPFeature .title {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.VPFeature .details {
+  font-size: 12.5px !important;
+  font-weight: 300 !important;
+  color: var(--vp-c-text-2) !important;
+  line-height: 1.6 !important;
+}
+
+/* ── 문서 본문 ── */
+.vp-doc h1 {
+  font-size: 32px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.15 !important;
+}
+
+.vp-doc h2 {
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+  border-top: none !important;
+  padding-top: 0 !important;
+  margin-top: 24px !important;
+}
+
+.vp-doc h3 {
+  font-size: 16px !important;
+  font-weight: 500 !important;
+}
+
+.vp-doc p {
+  font-size: 14px !important;
+  font-weight: 300 !important;
+  line-height: 1.75 !important;
+  color: var(--vp-c-text-2) !important;
+}
+
+.vp-doc li {
+  font-size: 14px !important;
+  font-weight: 300 !important;
+  line-height: 1.7 !important;
+  color: var(--vp-c-text-2) !important;
+}
+
+.vp-doc strong {
+  color: var(--vp-c-text-1) !important;
+  font-weight: 500 !important;
+}
+
+/* 인라인 코드 */
+.vp-doc code {
+  font-family: 'IBM Plex Mono', monospace !important;
+  font-size: 12px !important;
+  background: var(--vp-code-bg) !important;
+  color: var(--vp-c-brand-1) !important;
+  border-radius: 5px !important;
+  padding: 2px 6px !important;
+}
+
+/* 코드블록 */
+.vp-doc div[class*='language-'] {
+  border-radius: 10px !important;
+  margin: 16px 0 !important;
+}
+
+/* 테이블 */
+.vp-doc table {
+  font-size: 13px !important;
+}
+
+.vp-doc th {
+  font-weight: 500 !important;
+  font-size: 12px !important;
+  color: var(--vp-c-text-1) !important;
+  background: var(--vp-c-bg-soft) !important;
+}
+
+.vp-doc td {
+  font-weight: 300 !important;
+  color: var(--vp-c-text-2) !important;
+}
+
+/* 인용구 */
+.vp-doc blockquote {
+  border-left: 3px solid #c3e6cc !important;
+  background: #e8f5ec !important;
+  border-radius: 0 8px 8px 0 !important;
+}
+
+.dark .vp-doc blockquote {
+  background: rgba(52,168,83,0.08) !important;
+  border-left-color: rgba(52,168,83,0.4) !important;
+}
+
+/* ── 검색 ── */
+.VPLocalSearchBox {
+  border-radius: 14px !important;
+}
+
+.VPLocalSearchBox .search-input {
+  font-family: var(--vp-font-family-base) !important;
+  font-size: 15px !important;
+}
+
+/* ── 이전/다음 네비 ── */
+.VPDocFooter .pager-link {
+  border-radius: 10px !important;
+  border: 1px solid var(--vp-c-divider) !important;
+  transition: all 0.18s !important;
+}
+
+.VPDocFooter .pager-link:hover {
+  border-color: #c3e6cc !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06) !important;
+}
+
+.VPDocFooter .pager-link .title {
+  font-weight: 500 !important;
+  font-size: 13px !important;
+}
+
+/* ── 스크롤바 ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--vp-c-divider); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #bbb; }
+
+/* 코드블록 테마 - github light */
+.vp-doc div[class*='language-'] {
+  background: #f6f8fa !important;
+}
+
+.vp-doc div[class*='language-'] code,
+.vp-doc div[class*='language-'] .line {
+  color: #24292e !important;
+}
+
+/* 다크모드 - github dark */
+.dark .vp-doc div[class*='language-'] {
+  background: #161b22 !important;
+}
+
+.dark .vp-doc div[class*='language-'] code,
+.dark .vp-doc div[class*='language-'] .line {
+  color: #e6edf3 !important;
+}
