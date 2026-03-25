@@ -1,0 +1,168 @@
+name: Rebuild Index
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/**.md'
+      - '!index.html'
+  workflow_dispatch:
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate cards and rebuild index.html
+        run: |
+          node << 'EOF'
+          const fs = require('fs');
+          const path = require('path');
+
+          // 챕터 폴더 메타 정의
+          const CHAPTER_META = {
+            '01-getting-started': { label: '01 · 시작하기',            id: 'getting-started' },
+            '02-context':         { label: '02 · 컨텍스트 관리 전략',   id: 'context'         },
+            '03-workflow':        { label: '03 · 실전 워크플로우',       id: 'workflow'        },
+            '04-agents':          { label: '04 · 에이전트 & 자동화',     id: 'agents'          },
+            '05-tips':            { label: '05 · 팁 & 주의사항',         id: 'tips'            },
+            '06-supabase':        { label: '06 · 실전 패턴 (Supabase)',  id: 'supabase'        },
+            '07-devlog':          { label: '07 · 개발 일지',             id: 'devlog'          },
+            '08-troubleshooting': { label: '08 · 트러블슈팅',            id: 'troubleshooting' },
+          };
+
+          // md 파일에서 제목 추출 (# H1 or 파일명)
+          function extractTitle(filePath) {
+            try {
+              const content = fs.readFileSync(filePath, 'utf-8');
+              const match = content.match(/^#\s+(.+)$/m);
+              if (match) return match[1].trim();
+            } catch {}
+            return path.basename(filePath, '.md')
+              .replace(/-/g, ' ')
+              .replace(/\b\w/g, c => c.toUpperCase());
+          }
+
+          // md 파일에서 첫 문단 추출 (설명)
+          function extractDesc(filePath) {
+            try {
+              const content = fs.readFileSync(filePath, 'utf-8');
+              // 헤더, 빈 줄, 코드블록 제외하고 첫 문장 찾기
+              const lines = content.split('\n');
+              for (const line of lines) {
+                const t = line.trim();
+                if (t && !t.startsWith('#') && !t.startsWith('```') && !t.startsWith('---') && !t.startsWith('>')) {
+                  const clean = t.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/[*_`]/g, '');
+                  if (clean.length > 10) return clean.slice(0, 80) + (clean.length > 80 ? '…' : '');
+                }
+              }
+            } catch {}
+            return '';
+          }
+
+          // NEW 뱃지 — 최근 7일 이내 수정된 파일
+          function isNew(filePath) {
+            try {
+              const stat = fs.statSync(filePath);
+              const diffDays = (Date.now() - stat.mtimeMs) / (1000 * 60 * 60 * 24);
+              return diffDays < 7;
+            } catch { return false; }
+          }
+
+          // 카드 HTML 생성
+          function cardHtml(num, title, desc, fileName, isNewFile) {
+            const badge = isNewFile ? ` <span class="card-badge">NEW</span>` : '';
+            return `      <a class="card fade-in" href="./${fileName}">
+                <span class="card-num">${num}</span>
+                <div class="card-title">${title}</div>
+                <div class="card-desc">${desc}</div>
+                <div class="card-links"><span class="card-link">${path.basename(fileName)}${badge}</span></div>
+              </a>`;
+          }
+
+          // 섹션 HTML 생성
+          function sectionHtml(folderName, meta, cards) {
+            return `  <section id="${meta.id}">
+            <div class="section-header"><span class="section-title">${meta.label}</span><div class="section-line"></div></div>
+            <div class="cards-grid">
+          ${cards.join('\n')}
+            </div>
+          </section>`;
+          }
+
+          // 메인: 폴더 스캔
+          const rootDir = process.cwd();
+          const sections = [];
+
+          const sortedFolders = Object.keys(CHAPTER_META).sort();
+
+          for (const folder of sortedFolders) {
+            const folderPath = path.join(rootDir, folder);
+            if (!fs.existsSync(folderPath)) continue;
+
+            const meta = CHAPTER_META[folder];
+            const files = fs.readdirSync(folderPath)
+              .filter(f => f.endsWith('.md') && f !== 'README.md' || f === 'README.md')
+              .sort();
+
+            if (files.length === 0) continue;
+
+            const chapterNum = folder.split('-')[0]; // "01", "02" ...
+            const cards = files.map((file, idx) => {
+              const filePath = path.join(folderPath, file);
+              const num = `${chapterNum}-${String(idx + 1).padStart(2, '0')}`;
+              const title = extractTitle(filePath);
+              const desc = extractDesc(filePath);
+              const relPath = `${folder}/${file}`;
+              return cardHtml(num, title, desc, relPath, isNew(filePath));
+            });
+
+            sections.push(sectionHtml(folder, meta, cards));
+          }
+
+          const generatedHtml = sections.join('\n\n');
+
+          // index.html 마커 사이에 주입
+          const indexPath = path.join(rootDir, 'index.html');
+          let html = fs.readFileSync(indexPath, 'utf-8');
+
+          const START = '<!-- CHAPTERS_START -->';
+          const END   = '<!-- CHAPTERS_END -->';
+
+          if (!html.includes(START) || !html.includes(END)) {
+            console.error('❌ index.html에 CHAPTERS_START / CHAPTERS_END 마커가 없습니다.');
+            process.exit(1);
+          }
+
+          const before = html.slice(0, html.indexOf(START) + START.length);
+          const after  = html.slice(html.indexOf(END));
+
+          const updated = `${before}\n${generatedHtml}\n  ${after}`;
+          fs.writeFileSync(indexPath, updated);
+
+          console.log(`✅ ${sections.length}개 섹션, index.html 업데이트 완료`);
+          EOF
+
+      - name: Commit updated index.html
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if git diff --staged --quiet; then
+            echo "변경사항 없음 — 스킵"
+          else
+            git commit -m "docs: auto-rebuild index.html [skip ci]"
+            git push
+          fi
