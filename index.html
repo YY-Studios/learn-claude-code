@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>learn-claude-code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Pretendard:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #ffffff;
+    --bg2:      #f5f5f7;
+    --bg3:      #ebebed;
+    --border:   #d2d2d7;
+    --border2:  #e8e8ed;
+    --text:     #1d1d1f;
+    --sub:      #6e6e73;
+    --muted:    #aeaeb2;
+    --accent:   #34a853;
+    --accent-l: #e8f5ec;
+    --accent-m: #c3e6cc;
+    --sidebar-w: 252px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    display: flex;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  aside {
+    width: var(--sidebar-w);
+    min-height: 100vh;
+    background: var(--bg2);
+    border-right: 1px solid var(--border2);
+    position: fixed;
+    top: 0; left: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+  }
+  .sidebar-logo { padding: 22px 18px 18px; border-bottom: 1px solid var(--border2); }
+  .logo-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px; color: var(--accent);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    display: block; margin-bottom: 5px; font-weight: 500;
+  }
+  .sidebar-logo h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px; font-weight: 500; color: var(--text); letter-spacing: -0.01em;
+  }
+  .sidebar-search {
+    margin: 12px 12px 4px;
+    display: flex; align-items: center; gap: 7px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 10px;
+    color: var(--muted); font-size: 12px; cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .sidebar-search:hover { border-color: #bbb; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  nav { padding: 6px 0 24px; flex: 1; }
+  .nav-section { padding: 0 10px; margin-top: 2px; }
+  .nav-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px; font-weight: 500; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+    padding: 14px 8px 5px; display: block;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 7px;
+    padding: 5px 8px; border-radius: 6px; color: var(--sub);
+    text-decoration: none; font-size: 12.5px;
+    transition: all 0.12s; cursor: pointer; margin-bottom: 1px; font-weight: 400;
+  }
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: var(--accent-l); color: var(--accent); font-weight: 500; }
+  .nav-item .dot {
+    width: 3px; height: 3px; border-radius: 50%;
+    background: var(--border); flex-shrink: 0; margin-top: 1px;
+  }
+  .nav-item.active .dot { background: var(--accent); }
+  .nav-item:hover .dot { background: var(--muted); }
+  .nav-badge {
+    margin-left: auto; font-size: 9px;
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--accent-l); color: var(--accent);
+    padding: 1px 6px; border-radius: 4px; font-weight: 500;
+  }
+  .sidebar-footer { padding: 14px 18px; border-top: 1px solid var(--border2); }
+  .gh-link {
+    display: flex; align-items: center; gap: 7px;
+    color: var(--sub); text-decoration: none;
+    font-size: 11.5px; font-family: 'IBM Plex Mono', monospace;
+    transition: color 0.2s;
+  }
+  .gh-link:hover { color: var(--text); }
+  main { margin-left: var(--sidebar-w); flex: 1; max-width: 860px; padding: 0 52px 80px; }
+  .hero { padding: 68px 0 52px; border-bottom: 1px solid var(--border2); margin-bottom: 52px; }
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase;
+    margin-bottom: 22px; padding: 5px 10px;
+    background: var(--accent-l); border-radius: 6px; font-weight: 500;
+  }
+  .pulse {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.75); }
+  }
+  .hero h2 {
+    font-size: 48px; font-weight: 600; line-height: 1.08;
+    letter-spacing: -0.03em; color: var(--text); margin-bottom: 18px;
+  }
+  .hero h2 .green { color: var(--accent); }
+  .hero-desc {
+    font-size: 16px; color: var(--sub); max-width: 480px;
+    line-height: 1.65; font-weight: 300; margin-bottom: 30px;
+  }
+  .hero-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--accent); color: #fff;
+    padding: 10px 20px; border-radius: 980px;
+    font-size: 13px; font-weight: 500; text-decoration: none;
+    transition: all 0.2s; letter-spacing: -0.01em;
+  }
+  .btn-primary:hover { background: #2d9348; box-shadow: 0 4px 16px rgba(52,168,83,0.28); transform: translateY(-1px); }
+  .btn-ghost {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border); color: var(--sub);
+    padding: 10px 20px; border-radius: 980px;
+    font-size: 13px; font-weight: 400; text-decoration: none;
+    transition: all 0.2s; background: var(--bg);
+  }
+  .btn-ghost:hover { border-color: #999; color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+  .hero-meta {
+    display: flex; gap: 28px; margin-top: 36px;
+    padding-top: 28px; border-top: 1px solid var(--border2);
+  }
+  .meta-item { display: flex; flex-direction: column; gap: 3px; }
+  .meta-label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  .meta-value { font-size: 13px; font-weight: 500; color: var(--text); }
+  .meta-value.green { color: var(--accent); display: flex; align-items: center; gap: 5px; }
+  .tracker-card {
+    background: var(--accent-l); border: 1px solid var(--accent-m);
+    border-radius: 12px; padding: 18px 22px; margin-bottom: 52px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .tracker-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: #fff; border: 1px solid var(--accent-m);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(52,168,83,0.1);
+  }
+  .tracker-info { flex: 1; }
+  .tracker-info h3 { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
+  .tracker-info p { font-size: 12px; color: var(--sub); line-height: 1.5; }
+  .tracker-info p code {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    background: #fff; padding: 1px 5px; border-radius: 4px;
+    color: var(--accent); border: 1px solid var(--accent-m);
+  }
+  .tracker-status { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+  .status-dot {
+    display: flex; align-items: center; gap: 5px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; color: var(--accent); font-weight: 500;
+  }
+  .status-dot::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+  section { margin-bottom: 52px; }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .section-title { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  .section-line { flex: 1; height: 1px; background: var(--border2); }
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(248px, 1fr)); gap: 10px; }
+  .card {
+    background: var(--bg); border: 1px solid var(--border2);
+    border-radius: 12px; padding: 18px 20px;
+    text-decoration: none; display: block; transition: all 0.18s;
+  }
+  .card:hover { border-color: var(--accent-m); box-shadow: 0 4px 20px rgba(0,0,0,0.07); transform: translateY(-1px); }
+  .card-num { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.08em; margin-bottom: 9px; display: block; }
+  .card-title { font-size: 13.5px; font-weight: 500; color: var(--text); margin-bottom: 6px; line-height: 1.35; letter-spacing: -0.01em; }
+  .card-desc { font-size: 12px; color: var(--sub); line-height: 1.55; margin-bottom: 14px; font-weight: 300; }
+  .card-links { display: flex; flex-direction: column; gap: 2px; }
+  .card-link { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; padding: 2px 0; transition: color 0.15s; }
+  .card:hover .card-link { color: var(--accent); }
+  .card-link::before { content: '↗'; font-size: 9px; }
+  .card-badge { display: inline-block; font-size: 9px; font-family: 'IBM Plex Mono', monospace; background: var(--accent-l); color: var(--accent); padding: 1px 5px; border-radius: 4px; margin-left: 4px; font-weight: 500; }
+  .stack-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .stack-table th { text-align: left; font-family: 'IBM Plex Mono', monospace; font-size: 9px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 0 14px 10px; border-bottom: 1px solid var(--border2); }
+  .stack-table td { padding: 11px 14px; border-bottom: 1px solid var(--border2); vertical-align: middle; }
+  .stack-table tr:last-child td { border-bottom: none; }
+  .stack-table tr:hover td { background: var(--bg2); }
+  .stack-table td:first-child { color: var(--sub); font-size: 12px; width: 120px; font-weight: 300; }
+  .stack-table td:nth-child(2) { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text); font-weight: 500; }
+  .stack-table td:nth-child(3) { font-size: 12px; color: var(--sub); font-weight: 300; }
+  footer { margin-top: 52px; padding-top: 24px; border-top: 1px solid var(--border2); display: flex; align-items: center; justify-content: space-between; }
+  footer p { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+  footer a { color: var(--accent); text-decoration: none; }
+  .fade-in { opacity: 0; transform: translateY(10px); animation: fadeIn 0.45s ease forwards; }
+  @keyframes fadeIn { to { opacity: 1; transform: none; } }
+  .fade-in:nth-child(1) { animation-delay: 0.04s; }
+  .fade-in:nth-child(2) { animation-delay: 0.08s; }
+  .fade-in:nth-child(3) { animation-delay: 0.12s; }
+  .fade-in:nth-child(4) { animation-delay: 0.16s; }
+  .fade-in:nth-child(5) { animation-delay: 0.20s; }
+  .fade-in:nth-child(6) { animation-delay: 0.24s; }
+</style>
+</head>
+<body>
+
+<aside>
+  <div class="sidebar-logo">
+    <span class="logo-tag">✦ docs</span>
+    <h1>learn-claude-code</h1>
+  </div>
+  <div class="sidebar-search">
+    <span style="font-size:13px;">⌕</span>
+    <span>검색... (⌘K)</span>
+  </div>
+  <nav>
+    <div class="nav-section">
+      <span class="nav-label">시작하기</span>
+      <a class="nav-item active" href="#getting-started"><span class="dot"></span>설치 방법</a>
+      <a class="nav-item" href="#getting-started"><span class="dot"></span>기본 명령어 & 단축키</a>
+      <a class="nav-item" href="#getting-started"><span class="dot"></span>CLAUDE.md 작성법</a>
+    </div>
+    <div class="nav-section">
+      <span class="nav-label">컨텍스트 관리</span>
+      <a class="nav-item" href="#context"><span class="dot"></span>계층 구조</a>
+      <a class="nav-item" href="#context"><span class="dot"></span>/memory 자동 메모리</a>
+    </div>
+    <div class="nav-section">
+      <span class="nav-label">실전 워크플로우</span>
+      <a class="nav-item" href="#workflow"><span class="dot"></span>TODO.md 활용</a>
+      <a class="nav-item" href="#workflow"><span class="dot"></span>스크립트 오프로드</a>
+      <a class="nav-item" href="#workflow"><span class="dot"></span>Headless 모드</a>
+    </div>
+    <div class="nav-section">
+      <span class="nav-label">에이전트 & 자동화</span>
+      <a class="nav-item" href="#agents"><span class="dot"></span>WAT 프레임워크</a>
+      <a class="nav-item" href="#agents"><span class="dot"></span>커스텀 슬래시 명령어</a>
+      <a class="nav-item" href="#agents"><span class="dot"></span>MCP 연동</a>
+      <a class="nav-item" href="#agents"><span class="dot"></span>Skills <span class="nav-badge">NEW</span></a>
+      <a class="nav-item" href="#agents"><span class="dot"></span>Hooks <span class="nav-badge">NEW</span></a>
+    </div>
+    <div class="nav-section">
+      <span class="nav-label">팁 & 주의사항</span>
+      <a class="nav-item" href="#tips"><span class="dot"></span>잘 되는 것 / 안 되는 것</a>
+      <a class="nav-item" href="#tips"><span class="dot"></span>효과적인 지시 패턴</a>
+      <a class="nav-item" href="#tips"><span class="dot"></span>다른 AI와 협업</a>
+      <a class="nav-item" href="#tips"><span class="dot"></span>비용 관리</a>
+    </div>
+    <div class="nav-section">
+      <span class="nav-label">실전 패턴</span>
+      <a class="nav-item" href="#supabase"><span class="dot"></span>Supabase 훅 생성</a>
+    </div>
+    <div class="nav-section">
+      <span class="nav-label">트러블슈팅</span>
+      <a class="nav-item" href="#troubleshooting"><span class="dot"></span>컨텍스트 날아감</a>
+      <a class="nav-item" href="#troubleshooting"><span class="dot"></span>무한 루프 & 멈춤</a>
+      <a class="nav-item" href="#troubleshooting"><span class="dot"></span>토큰 초과</a>
+      <a class="nav-item" href="#troubleshooting"><span class="dot"></span>예상과 다른 출력</a>
+    </div>
+    <div class="nav-section">
+      <span class="nav-label">개발 일지</span>
+      <a class="nav-item" href="#devlog"><span class="dot"></span>타이핑룸 실전 사례</a>
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <a class="gh-link" href="https://github.com/yujinimda/learn-claude-code" target="_blank">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+      yujinimda / learn-claude-code
+    </a>
+  </div>
+</aside>
+
+<main>
+
+  <section class="hero">
+    <div class="hero-eyebrow"><span class="pulse"></span>실전 학습 가이드</div>
+    <h2>Claude Code,<br><span class="green">직접 써보며</span> 배우기</h2>
+    <p class="hero-desc">
+      설치부터 Supabase 백엔드리스 프로젝트 적용까지.<br>
+      실제 프로젝트를 만들면서 배운 것들을 함께 정리합니다.
+    </p>
+    <div class="hero-actions">
+      <a class="btn-primary" href="#getting-started">시작하기 →</a>
+      <a class="btn-ghost" href="https://github.com/yujinimda/learn-claude-code" target="_blank">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+        GitHub
+      </a>
+    </div>
+    <div class="hero-meta">
+      <div class="meta-item">
+        <span class="meta-label">AI 에이전트</span>
+        <span class="meta-value">Claude Code</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">백엔드</span>
+        <span class="meta-value">Supabase</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">업데이트</span>
+        <span class="meta-value green"><span class="pulse"></span>자동 추적 중</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="tracker-card">
+    <div class="tracker-icon">🤖</div>
+    <div class="tracker-info">
+      <h3>Claude Code 업데이트 자동 추적</h3>
+      <p>GitHub Actions가 2일마다 공식 릴리즈를 확인하고, GPT-4o가 분석해 <code>claude-code-update</code> 라벨로 이슈를 자동 생성합니다.</p>
+    </div>
+    <div class="tracker-status">
+      <span class="status-dot">active</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);">every 2 days</span>
+    </div>
+  </div>
+
+  <!-- CHAPTERS_START -->
+  <!-- CHAPTERS_END -->
+
+  <section>
+    <div class="section-header"><span class="section-title">스택</span><div class="section-line"></div></div>
+    <table class="stack-table">
+      <thead><tr><th>영역</th><th>도구</th><th>용도</th></tr></thead>
+      <tbody>
+        <tr><td>AI 에이전트</td><td>Claude Code</td><td>Anthropic의 터미널 기반 AI 코딩 도구</td></tr>
+        <tr><td>백엔드</td><td>Supabase</td><td>DB + Edge Functions 백엔드리스 패턴</td></tr>
+        <tr><td>문장 생성</td><td>OpenAI API</td><td>GPT-4o 기반 콘텐츠 자동 생성</td></tr>
+        <tr><td>업데이트 추적</td><td>GitHub Actions</td><td>2일마다 릴리즈 자동 감지 & 이슈 생성</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    <p>© 2026 <a href="https://github.com/yujinimda">yujinimda</a> · YY-Studios</p>
+    <p>PR 환영합니다 ✦</p>
+  </footer>
+
+</main>
+</body>
+</html>
