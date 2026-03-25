@@ -16,7 +16,6 @@ jobs:
       - name: Fetch Claude Code releases
         id: fetch_releases
         run: |
-          # 최신 릴리즈 5개 가져오기
           RELEASES=$(curl -s \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/anthropics/claude-code/releases?per_page=5")
@@ -25,7 +24,7 @@ jobs:
           echo "$RELEASES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Check latest version and existing issues
+      - name: Check latest version
         id: check_version
         run: |
           RELEASES='${{ steps.fetch_releases.outputs.releases }}'
@@ -36,7 +35,6 @@ jobs:
           echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
           echo "latest_date=$LATEST_DATE" >> $GITHUB_OUTPUT
           
-          # release body를 파일에 저장 (특수문자 이슈 방지)
           echo "$LATEST_BODY" > /tmp/release_body.txt
           echo "$RELEASES" > /tmp/releases.json
 
@@ -45,7 +43,6 @@ jobs:
         run: |
           LATEST_TAG="${{ steps.check_version.outputs.latest_tag }}"
           
-          # 기존 이슈에서 같은 버전 태그가 있는지 확인
           EXISTING=$(curl -s \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/issues?state=all&labels=claude-code-update&per_page=50" \
@@ -68,7 +65,6 @@ jobs:
           RELEASE_BODY=$(cat /tmp/release_body.txt)
           LATEST_TAG="${{ steps.check_version.outputs.latest_tag }}"
           
-          # GPT-4o에게 분석 요청
           RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $OPENAI_API_KEY" \
@@ -81,23 +77,25 @@ jobs:
                 messages: [
                   {
                     role: "system",
-                    content: "당신은 Claude Code (Anthropic의 AI 코딩 도구) 업데이트를 분석하는 전문가입니다. 릴리즈 노트를 분석해서 개발자가 알아야 할 중요한 내용을 정리해주세요."
+                    content: "당신은 Claude Code (Anthropic의 AI 코딩 도구) 업데이트를 분석하는 전문가입니다. 개발자 관점에서 실질적으로 중요한 내용만 간결하게 정리해주세요. 반드시 순수 JSON만 반환하고 마크다운 코드블록이나 설명 텍스트는 절대 포함하지 마세요."
                   },
                   {
                     role: "user",
-                    content: ("Claude Code 버전 " + $tag + " 릴리즈 노트를 분석해주세요.\n\n릴리즈 노트:\n" + $body + "\n\n다음 형식으로 JSON만 반환해주세요 (다른 텍스트 없이):\n{\n  \"should_create_issue\": true or false,\n  \"categories\": [\"새 버전 릴리즈\", \"새 기능 추가\", \"Breaking change\", \"보안 관련\"] 중 해당하는 것들,\n  \"summary\": \"한국어로 2-3줄 요약\",\n  \"breaking_changes\": \"Breaking change가 있으면 설명, 없으면 null\",\n  \"new_features\": [\"새 기능 목록\"],\n  \"security\": \"보안 관련 내용이 있으면 설명, 없으면 null\",\n  \"action_required\": \"개발자가 취해야 할 액션이 있으면 설명, 없으면 null\"\n}")
+                    content: ("다음은 Claude Code " + $tag + " 릴리즈 노트입니다.\n\n" + $body + "\n\n---\n각 카테고리 판단 기준:\n- 새 버전 릴리즈: 버전 태그가 존재하면 항상 true\n- Breaking change: 기존 명령어·API·설정 방식이 바뀐 경우\n- 새 기능 추가: 새로운 명령어, 옵션, 통합 기능이 생긴 경우\n- 보안 관련: CVE, 취약점 수정, 인증 변경 포함\n\n반드시 아래 JSON 형식만 반환하세요. 마크다운 코드블록(```), 설명 텍스트 없이 순수 JSON만:\n{\n  \"should_create_issue\": true,\n  \"categories\": [\"새 버전 릴리즈\", \"새 기능 추가\", \"Breaking change\", \"보안 관련\"] 중 해당하는 것들,\n  \"summary\": \"개발자 관점에서 핵심만 3줄 이내 한국어 요약\",\n  \"breaking_changes\": \"기존 사용 방식이 바뀌는 내용, 없으면 null\",\n  \"new_features\": [\"새 기능이나 명령어를 구체적으로\"],\n  \"security\": \"보안 관련 내용, 없으면 null\",\n  \"action_required\": \"업그레이드 명령어나 설정 변경이 필요하면 구체적으로 (예: npm i -g @anthropic-ai/claude-code@latest), 없으면 null\"\n}")
                   }
                 ]
               }')")
           
           ANALYSIS=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
           
+          # 혹시 코드블록으로 감싸진 경우 제거
+          ANALYSIS_CLEAN=$(echo "$ANALYSIS" | sed 's/```json//g' | sed 's/```//g' | xargs)
+          
           echo "analysis<<EOF" >> $GITHUB_OUTPUT
-          echo "$ANALYSIS" >> $GITHUB_OUTPUT
+          echo "$ANALYSIS_CLEAN" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           
-          # should_create_issue 추출
-          SHOULD_CREATE=$(echo "$ANALYSIS" | jq -r '.should_create_issue // false')
+          SHOULD_CREATE=$(echo "$ANALYSIS_CLEAN" | jq -r '.should_create_issue // true')
           echo "should_create=$SHOULD_CREATE" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Issue
@@ -113,35 +111,34 @@ jobs:
           
           SUMMARY=$(echo "$ANALYSIS" | jq -r '.summary // "분석 결과 없음"')
           BREAKING=$(echo "$ANALYSIS" | jq -r '.breaking_changes // "없음"')
-          FEATURES=$(echo "$ANALYSIS" | jq -r '.new_features // [] | if type == "array" then map("- " + .) | join("\n") else . end')
+          FEATURES=$(echo "$ANALYSIS" | jq -r '.new_features // [] | if type == "array" and length > 0 then map("- " + .) | join("\n") else "없음" end')
           SECURITY=$(echo "$ANALYSIS" | jq -r '.security // "없음"')
           ACTION=$(echo "$ANALYSIS" | jq -r '.action_required // "없음"')
           CATEGORIES=$(echo "$ANALYSIS" | jq -r '.categories // [] | join(", ")')
-          
           RELEASE_DATE=$(echo "$LATEST_DATE" | cut -c1-10)
           
           ISSUE_BODY="## 📦 Claude Code ${LATEST_TAG} 업데이트
 
-          > 릴리즈 날짜: ${RELEASE_DATE} | 카테고리: ${CATEGORIES}
+> 릴리즈 날짜: ${RELEASE_DATE} | 카테고리: ${CATEGORIES}
 
-          ### 요약
-          ${SUMMARY}
+### 요약
+${SUMMARY}
 
-          ### ⚠️ Breaking Changes
-          ${BREAKING}
+### ⚠️ Breaking Changes
+${BREAKING}
 
-          ### ✨ 새로운 기능
-          ${FEATURES:-없음}
+### ✨ 새로운 기능
+${FEATURES}
 
-          ### 🔒 보안
-          ${SECURITY}
+### 🔒 보안
+${SECURITY}
 
-          ### 🚀 필요한 액션
-          ${ACTION}
+### 🚀 필요한 액션
+${ACTION}
 
-          ---
-          🔗 [공식 릴리즈 노트](https://github.com/anthropics/claude-code/releases/tag/${LATEST_TAG})
-          🤖 *이 이슈는 GitHub Actions가 자동 생성했습니다.*"
+---
+🔗 [공식 릴리즈 노트](https://github.com/anthropics/claude-code/releases/tag/${LATEST_TAG})
+🤖 *이 이슈는 GitHub Actions가 자동 생성했습니다.*"
           
           gh issue create \
             --repo "${{ github.repository }}" \
