@@ -11,18 +11,20 @@ Claude Code를 사용하려면 **Pro 플랜 이상** 필수입니다. 무료 플
 | 플랜 | 가격 | 추천 대상 |
 |---|---|---|
 | Pro | $20/월 | 처음 시작하는 경우 |
-| Max | $100/월~ | 사용량이 많아졌을 때 |
-| Teams / Enterprise | 별도 | 팀 단위 |
+| Max 5× | $100/월 | 사용량이 늘었을 때 (Pro 대비 5배 한도) |
+| Max 20× | $200/월 | 헤비 유저 / 장시간 에이전트 실행 |
+| Teams | $30/인/월 (최소 5인) | 팀 단위, 공유 컨텍스트 필요 시 |
+| Enterprise | 별도 문의 | 대규모 조직 |
 
-> 💡 프로로 시작해서 사용량에 맞게 업그레이드하는 걸 추천합니다.
+> 💡 Pro로 시작해서 `/context`로 토큰 사용량을 모니터링하다가 한도를 자주 넘기면 Max로 업그레이드하는 걸 추천합니다.
 
 ---
 
 ## 2. 설치
 
-### ✅ 권장 방법 — 네이티브 설치 (Node.js 불필요)
+### ✅ 권장 방법 — 네이티브 설치
 
-공식 권장 방법으로, 별도의 Node.js 설치 없이 터미널 명령어 한 줄로 설치 가능합니다. 백그라운드 자동 업데이트도 지원합니다.
+공식 권장 방법입니다. 별도의 Node.js 설치 없이 터미널 명령어 한 줄로 설치 가능하며, 백그라운드 자동 업데이트를 지원합니다.
 
 **macOS / Linux**
 ```bash
@@ -42,10 +44,15 @@ winget install Anthropic.ClaudeCode
 
 > ⚠️ 공식 문서에서 npm 설치는 deprecated(더 이상 권장하지 않는) 방식으로 분류됩니다. 신규 설치라면 네이티브 설치를 먼저 고려하세요.
 
-Node.js 환경이 이미 세팅되어 있고 npm으로 관리하고 싶다면 사용 가능합니다.
+Node.js 18+ 환경이 이미 세팅되어 있고 npm으로 관리하고 싶다면 사용 가능합니다.
 
 ```bash
 npm install -g @anthropic-ai/claude-code
+```
+
+**설치 확인:**
+```bash
+claude --version
 ```
 
 ---
@@ -66,7 +73,7 @@ claude
 1. VS Code 확장 마켓플레이스에서 `Claude Code for VS Code` 검색 후 설치
 2. 설치 완료 후 우측 상단 아이콘 클릭
 
-> ![Claude Code VS Code 아이콘](https://github.com/user-attachments/assets/a7aff01c-562f-4086-9cd4-5745d42290af)
+> ⚠️ **반드시 프로젝트 루트 디렉토리에서 실행하세요.** 하위 폴더(예: `/apps/api`)에서 실행하면 프로젝트 전체 구조를 읽지 못해 엉뚱한 파일을 생성하거나 찾지 못하는 문제가 발생합니다.
 
 ---
 
@@ -76,4 +83,20 @@ claude
 
 ---
 
-> 💡 **다음 단계:** 프로젝트 루트에 `CLAUDE.md` 파일을 만드세요. → [CLAUDE.md 작성법](./claude-md.md)
+## 5. 업데이트
+
+```bash
+# 네이티브 설치 (자동 업데이트됨, 수동으로 확인하려면)
+claude update
+
+# npm 설치의 경우
+npm update -g @anthropic-ai/claude-code
+
+# Windows winget
+winget upgrade Anthropic.ClaudeCode
+```
+
+---
+
+> 💡 **다음 단계:** 설치 중 문제가 생겼다면 → [트러블슈팅](./troubleshooting.md)  
+> 정상 설치됐다면 → [CLAUDE.md 작성법](./claude-md.md)으로 넘어가세요.
