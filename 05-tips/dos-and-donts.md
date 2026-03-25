@@ -20,7 +20,7 @@ UI 톤앤매너, 아키텍처 구조, 디자인 레퍼런스는 말보다 스크
 모호한 지시는 모호한 결과를 낳습니다. "테스트 코드 작성해줘" 보다 "사용자가 로그아웃했을 때의 엣지케이스를 커버하는 테스트 코드를 작성해줘. 목킹은 하지 마." 처럼 구체적으로 지시하세요.
 
 **think hard 활용**
-복잡한 아키텍처 결정이나 엣지케이스가 많은 문제에는 프롬프트 앞에 `think hard`를 붙이세요. Claude가 더 깊이 추론합니다.
+복잡한 아키텍처 결정이나 엣지케이스가 많은 문제에는 프롬프트 앞에 `think hard`를 붙이세요. Claude가 더 깊이 추론합니다. (내부 추론 토큰이 증가하므로 꼭 필요할 때만 사용)
 
 ```
 "think hard about the edge cases in our authentication flow"
@@ -58,7 +58,23 @@ CLAUDE.md가 길어질수록 Claude가 규칙을 무시하기 시작합니다. A
 같은 실수가 반복된다면 CLAUDE.md가 너무 길거나 지시가 모호한 것입니다. 해당 규칙을 CLAUDE.md에 `IMPORTANT:` 키워드로 강조하거나, 더 구체적으로 다시 작성하세요.
 
 **sudo로 npm 설치하기**
-권한 오류 시 `sudo npm install -g`를 사용하지 마세요. 올바른 해결 방법은 `nvm`을 사용하는 것입니다.
+권한 오류 시 `sudo npm install -g`를 사용하지 마세요. 올바른 해결 방법은 `nvm`을 사용하는 것입니다. → [트러블슈팅](../01-getting-started/troubleshooting.md)
+
+---
+
+## 💰 비용이 갑자기 많이 나올 때 체크리스트
+
+비용 이슈가 생겼을 때 순서대로 확인하세요.
+
+```
+1. /context → System Tools 항목이 크면 MCP 비활성화
+2. /context → User/Assistant가 크면 /compact 또는 /clear
+3. CLAUDE.md 길이 확인 → 300줄 넘으면 폴더별로 분리
+4. 서브에이전트 필요 없는 작업인데 여러 에이전트 실행 중 아닌지 확인
+5. 대화 중간에 관련 없는 질문이 많이 끼어 있지 않은지 확인
+```
+
+→ 비용 최적화 전략 전체 가이드: [cost-optimization.md](./cost-optimization.md)
 
 ---
 
@@ -70,3 +86,4 @@ CLAUDE.md가 길어질수록 Claude가 규칙을 무시하기 시작합니다. A
 - 기능 하나가 완전히 끝났다
 - Claude가 이전에 없던 파일이나 패키지를 갑자기 만들기 시작한다
 - 응답이 이상하게 느려지거나 엉뚱한 내용을 반복한다
+- `/context`에서 컨텍스트가 70% 이상 찼다
