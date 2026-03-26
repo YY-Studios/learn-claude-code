@@ -58,7 +58,7 @@ CLAUDE.md가 길어질수록 Claude가 규칙을 무시하기 시작합니다. A
 같은 실수가 반복된다면 CLAUDE.md가 너무 길거나 지시가 모호한 것입니다. 해당 규칙을 CLAUDE.md에 `IMPORTANT:` 키워드로 강조하거나, 더 구체적으로 다시 작성하세요.
 
 **sudo로 npm 설치하기**
-권한 오류 시 `sudo npm install -g`를 사용하지 마세요. 올바른 해결 방법은 `nvm`을 사용하는 것입니다. → [트러블슈팅](../01-getting-started/troubleshooting.md)
+권한 오류 시 `sudo npm install -g`를 사용하지 마세요. 올바른 해결 방법은 `nvm`을 사용하는 것입니다. → [트러블슈팅](../01-getting-started/04-troubleshooting.md)
 
 ---
 

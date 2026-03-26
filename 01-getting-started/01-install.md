@@ -98,5 +98,5 @@ winget upgrade Anthropic.ClaudeCode
 
 ---
 
-> 💡 **다음 단계:** 설치 중 문제가 생겼다면 → [트러블슈팅](./troubleshooting.md)  
-> 정상 설치됐다면 → [CLAUDE.md 작성법](./claude-md.md)으로 넘어가세요.
+> 💡 **다음 단계:** 설치 중 문제가 생겼다면 → [트러블슈팅](./04-troubleshooting.md)  
+> 정상 설치됐다면 → [CLAUDE.md 작성법](./03-claude-md.md)으로 넘어가세요.
