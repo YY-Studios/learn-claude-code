@@ -62,7 +62,7 @@ export default defineConfig({
   lang: 'ko-KR',
 
   // GitHub Pages 배포 시 레포명으로 base 설정
-  base: '/learn-claude-code/',
+  base: process.env.VERCEL ? '/' : '/learn-claude-code/',
 
   head: [
     ['meta', { name: 'og:title', content: 'learn-claude-code' }],
