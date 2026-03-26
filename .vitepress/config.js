@@ -68,6 +68,7 @@ export default defineConfig({
     ['meta', { name: 'og:title', content: 'learn-claude-code' }],
     ['meta', { name: 'og:description', content: 'Claude Code 실전 학습 가이드' }],
     ['meta', { name: 'theme-color', content: '#34a853' }],
+    ['meta', { name: 'google-site-verification', content: 'cwIby1Hs5a_fUlfDKzz3JweUsL5o2ElmCemCwwEfjJ0' }],
   ],
 
   themeConfig: {
