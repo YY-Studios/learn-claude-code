@@ -97,6 +97,9 @@ jobs:
             -H "Authorization: Bearer $OPENAI_API_KEY" \
             -d @/tmp/prompt_final.json)
 
+          echo "=== API 응답 ==="
+          echo "$RESPONSE"
+
           ANALYSIS=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
           ANALYSIS_CLEAN=$(echo "$ANALYSIS" | sed 's/```json//g' | sed 's/```//g' | xargs)
 
