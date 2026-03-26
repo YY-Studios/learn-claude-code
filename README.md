@@ -1,4 +1,9 @@
-# 🤖 learn-claude-code
+![Vercel](https://img.shields.io/badge/vercel-deployed-brightgreen?logo=vercel)
+![GitHub last commit](https://img.shields.io/github/last-commit/YY-Studios/learn-claude-code)
+![visitors](https://visitor-badge.laobi.icu/badge?page_id=YY-Studios.learn-claude-code)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+# 🤖 learn claude code
 > Claude Code 실전 학습 가이드 — 설치부터 Supabase 백엔드리스 프로젝트 적용까지
 
 Claude Code를 처음 접하는 개발자를 위한 실전 학습 레포입니다.  
