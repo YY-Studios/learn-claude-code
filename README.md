@@ -87,3 +87,14 @@ CLAUDE.md 계층 구조 → 스크립트 오프로드 → 비용 최적화 → W
 **더 깊이 파고들기 (🔴 고급):**
 Hooks → Skills → RLS 패턴 → 다른 AI와 협업
 
+---
+
+## 📎 참고 자료
+- [Claude Code 공식 문서](https://docs.anthropic.com/en/docs/claude-code)
+- [sv.developer](https://www.youtube.com/@sv.developer) — Claude Code 학습 영상 참고
+
+---
+
+## ✍️ 기여
+배우면서 발견한 내용을 자유롭게 추가해주세요.
+PR 환영합니다!
