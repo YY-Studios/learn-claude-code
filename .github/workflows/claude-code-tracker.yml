@@ -107,7 +107,7 @@ jobs:
           echo "$ANALYSIS_CLEAN" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-          SHOULD_CREATE=$(echo "$ANALYSIS_CLEAN" | jq -r '.should_create_issue // true')
+          SHOULD_CREATE=$(echo "$ANALYSIS_CLEAN" | tr -d '\n' | jq -r '.should_create_issue // true')
           echo "should_create=$SHOULD_CREATE" >> $GITHUB_OUTPUT
           
 
