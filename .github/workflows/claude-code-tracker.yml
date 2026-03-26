@@ -14,7 +14,6 @@ jobs:
 
     steps:
       - name: Fetch Claude Code releases
-        id: fetch_releases
         run: |
           # output으로 넘기지 않고 파일로 저장 (JSON 특수문자 bash 파싱 오류 방지)
           curl -s \
@@ -61,7 +60,6 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          RELEASE_BODY=$(cat /tmp/release_body.txt)
           LATEST_TAG="${{ steps.check_version.outputs.latest_tag }}"
 
           cat > /tmp/prompt.json << 'PROMPT'
@@ -81,9 +79,10 @@ jobs:
           }
           PROMPT
 
+          # --rawfile로 파일 직접 읽기 (특수문자 이스케이프 문제 방지)
           jq \
             --arg tag "$LATEST_TAG" \
-            --arg body "$RELEASE_BODY" \
+            --rawfile body /tmp/release_body.txt \
             '.messages[1].content = "다음은 Claude Code \($tag) 릴리즈 노트입니다.\n\n\($body)\n\n---\n판단 기준:\n- 새 버전 릴리즈: 항상 true\n- Breaking change: 기존 명령어·API·설정 방식이 바뀐 경우\n- 새 기능 추가: 새로운 명령어, 옵션, 통합 기능\n- 보안 관련: CVE, 취약점 수정\n\nJSON만 반환: {\"should_create_issue\": true, \"categories\": [], \"summary\": \"3줄 이내 한국어 요약\", \"breaking_changes\": null, \"new_features\": [], \"security\": null, \"action_required\": null}"' \
             /tmp/prompt.json > /tmp/prompt_final.json
 
