@@ -16,32 +16,37 @@ jobs:
       - name: Fetch Claude Code releases
         id: fetch_releases
         run: |
-          RELEASES=$(curl -s \
+          # output으로 넘기지 않고 파일로 저장 (JSON 특수문자 bash 파싱 오류 방지)
+          curl -s \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/anthropics/claude-code/releases?per_page=5")
-          echo "releases<<EOF" >> $GITHUB_OUTPUT
-          echo "$RELEASES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+            "https://api.github.com/repos/anthropics/claude-code/releases?per_page=5" \
+            > /tmp/releases.json
+          
+          echo "저장 완료: $(cat /tmp/releases.json | jq '.[0].tag_name')"
 
       - name: Check latest version
         id: check_version
         run: |
-          RELEASES='${{ steps.fetch_releases.outputs.releases }}'
-          LATEST_TAG=$(echo "$RELEASES" | jq -r '.[0].tag_name // "unknown"')
-          LATEST_BODY=$(echo "$RELEASES" | jq -r '.[0].body // ""')
-          LATEST_DATE=$(echo "$RELEASES" | jq -r '.[0].published_at // ""')
+          LATEST_TAG=$(cat /tmp/releases.json | jq -r '.[0].tag_name // "unknown"')
+          LATEST_DATE=$(cat /tmp/releases.json | jq -r '.[0].published_at // ""')
+          
+          # body도 파일로 저장
+          cat /tmp/releases.json | jq -r '.[0].body // ""' > /tmp/release_body.txt
+          
           echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
           echo "latest_date=$LATEST_DATE" >> $GITHUB_OUTPUT
-          echo "$LATEST_BODY" > /tmp/release_body.txt
+          echo "감지된 버전: $LATEST_TAG"
 
       - name: Check for duplicate issue
         id: check_duplicate
         run: |
           LATEST_TAG="${{ steps.check_version.outputs.latest_tag }}"
+          
           EXISTING=$(curl -s \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/issues?state=all&labels=claude-code-update&per_page=50" \
             | jq -r --arg tag "$LATEST_TAG" '[.[] | select(.title | contains($tag))] | length')
+          
           if [ "$EXISTING" -gt "0" ]; then
             echo "duplicate=true" >> $GITHUB_OUTPUT
             echo "⏭️ $LATEST_TAG 이슈가 이미 존재합니다. 스킵합니다."
