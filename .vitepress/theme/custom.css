@@ -212,16 +212,16 @@
 
 .vp-doc p {
   font-size: 14px !important;
-  font-weight: 300 !important;
+  font-weight: 400 !important;
   line-height: 1.75 !important;
-  color: var(--vp-c-text-2) !important;
+  color: var(--vp-c-text-1) !important;
 }
 
 .vp-doc li {
   font-size: 14px !important;
-  font-weight: 300 !important;
+  font-weight: 400 !important;
   line-height: 1.7 !important;
-  color: var(--vp-c-text-2) !important;
+  color: var(--vp-c-text-1) !important;
 }
 
 .vp-doc strong {
