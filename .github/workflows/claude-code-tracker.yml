@@ -59,32 +59,38 @@ jobs:
         if: steps.check_duplicate.outputs.duplicate == 'false'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LATEST_TAG: ${{ steps.check_version.outputs.latest_tag }}
         run: |
           LATEST_TAG="${{ steps.check_version.outputs.latest_tag }}"
 
-          cat > /tmp/prompt.json << 'PROMPT'
-          {
-            "model": "gpt-4o",
-            "max_tokens": 1500,
-            "messages": [
-              {
-                "role": "system",
-                "content": "당신은 Claude Code 업데이트를 분석하는 전문가입니다. 반드시 순수 JSON만 반환하고 마크다운 코드블록이나 설명 텍스트는 절대 포함하지 마세요."
-              },
-              {
-                "role": "user",
-                "content": "PLACEHOLDER"
-              }
-            ]
-          }
-          PROMPT
+          # Python으로 프롬프트 생성 (특수문자 안전하게 처리)
+          python3 << 'PYEOF'
+          import json, os
 
-          # --rawfile로 파일 직접 읽기 (특수문자 이스케이프 문제 방지)
-          jq \
-            --arg tag "$LATEST_TAG" \
-            --rawfile body /tmp/release_body.txt \
-            '.messages[1].content = "다음은 Claude Code \($tag) 릴리즈 노트입니다.\n\n\($body)\n\n---\n판단 기준:\n- 새 버전 릴리즈: 항상 true\n- Breaking change: 기존 명령어·API·설정 방식이 바뀐 경우\n- 새 기능 추가: 새로운 명령어, 옵션, 통합 기능\n- 보안 관련: CVE, 취약점 수정\n\nJSON만 반환: {\"should_create_issue\": true, \"categories\": [], \"summary\": \"3줄 이내 한국어 요약\", \"breaking_changes\": null, \"new_features\": [], \"security\": null, \"action_required\": null}"' \
-            /tmp/prompt.json > /tmp/prompt_final.json
+          tag = os.environ.get("LATEST_TAG", "")
+          with open("/tmp/release_body.txt", "r") as f:
+              body = f.read()
+
+          prompt = {
+              "model": "gpt-4o",
+              "max_tokens": 1500,
+              "messages": [
+                  {
+                      "role": "system",
+                      "content": "당신은 Claude Code 업데이트를 분석하는 전문가입니다. 반드시 순수 JSON만 반환하고 마크다운 코드블록이나 설명 텍스트는 절대 포함하지 마세요."
+                  },
+                  {
+                      "role": "user",
+                      "content": f"다음은 Claude Code {tag} 릴리즈 노트입니다.\n\n{body}\n\n---\n판단 기준:\n- 새 버전 릴리즈: 항상 true\n- Breaking change: 기존 명령어·API·설정 방식이 바뀐 경우\n- 새 기능 추가: 새로운 명령어, 옵션, 통합 기능\n- 보안 관련: CVE, 취약점 수정\n\nJSON만 반환: {{\"should_create_issue\": true, \"categories\": [], \"summary\": \"3줄 이내 한국어 요약\", \"breaking_changes\": null, \"new_features\": [], \"security\": null, \"action_required\": null}}"
+                  }
+              ]
+          }
+
+          with open("/tmp/prompt_final.json", "w") as f:
+              json.dump(prompt, f, ensure_ascii=False)
+
+          print("프롬프트 생성 완료")
+          PYEOF
 
           RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
             -H "Content-Type: application/json" \
@@ -100,6 +106,7 @@ jobs:
 
           SHOULD_CREATE=$(echo "$ANALYSIS_CLEAN" | jq -r '.should_create_issue // true')
           echo "should_create=$SHOULD_CREATE" >> $GITHUB_OUTPUT
+          
 
       - name: Create GitHub Issue
         if: |
