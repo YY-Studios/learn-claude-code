@@ -15,23 +15,21 @@ jobs:
     steps:
       - name: Fetch Claude Code releases
         run: |
-          # output으로 넘기지 않고 파일로 저장 (JSON 특수문자 bash 파싱 오류 방지)
           curl -s \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/anthropics/claude-code/releases?per_page=5" \
             > /tmp/releases.json
-          
-          echo "저장 완료: $(cat /tmp/releases.json | jq '.[0].tag_name')"
+
+          echo "저장 완료: $(jq -r '.[0].tag_name' /tmp/releases.json)"
 
       - name: Check latest version
         id: check_version
         run: |
-          LATEST_TAG=$(cat /tmp/releases.json | jq -r '.[0].tag_name // "unknown"')
-          LATEST_DATE=$(cat /tmp/releases.json | jq -r '.[0].published_at // ""')
-          
-          # body도 파일로 저장
-          cat /tmp/releases.json | jq -r '.[0].body // ""' > /tmp/release_body.txt
-          
+          LATEST_TAG=$(jq -r '.[0].tag_name // "unknown"' /tmp/releases.json)
+          LATEST_DATE=$(jq -r '.[0].published_at // ""' /tmp/releases.json)
+
+          jq -r '.[0].body // ""' /tmp/releases.json > /tmp/release_body.txt
+
           echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
           echo "latest_date=$LATEST_DATE" >> $GITHUB_OUTPUT
           echo "감지된 버전: $LATEST_TAG"
@@ -40,12 +38,12 @@ jobs:
         id: check_duplicate
         run: |
           LATEST_TAG="${{ steps.check_version.outputs.latest_tag }}"
-          
+
           EXISTING=$(curl -s \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/issues?state=all&labels=claude-code-update&per_page=50" \
             | jq -r --arg tag "$LATEST_TAG" '[.[] | select(.title | contains($tag))] | length')
-          
+
           if [ "$EXISTING" -gt "0" ]; then
             echo "duplicate=true" >> $GITHUB_OUTPUT
             echo "⏭️ $LATEST_TAG 이슈가 이미 존재합니다. 스킵합니다."
@@ -61,9 +59,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           LATEST_TAG: ${{ steps.check_version.outputs.latest_tag }}
         run: |
-          LATEST_TAG="${{ steps.check_version.outputs.latest_tag }}"
-
-          # Python으로 프롬프트 생성 (특수문자 안전하게 처리)
           python3 << 'PYEOF'
           import json, os
 
@@ -100,16 +95,20 @@ jobs:
           echo "=== API 응답 ==="
           echo "$RESPONSE"
 
-          ANALYSIS=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
-          ANALYSIS_CLEAN=$(echo "$ANALYSIS" | sed 's/```json//g' | sed 's/```//g' | xargs)
+          # content를 파일로 저장 (bash 변수 경유하면 특수문자 깨짐 방지)
+          echo "$RESPONSE" | jq -r '.choices[0].message.content' > /tmp/analysis.json
 
+          # 혹시 코드블록으로 감싸져 있으면 제거
+          sed -i 's/^```json//;s/^```//' /tmp/analysis.json
+
+          # output으로 전달
           echo "analysis<<EOF" >> $GITHUB_OUTPUT
-          echo "$ANALYSIS_CLEAN" >> $GITHUB_OUTPUT
+          cat /tmp/analysis.json >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-          SHOULD_CREATE=$(echo "$ANALYSIS_CLEAN" | tr -d '\n' | jq -r '.should_create_issue // true')
+          # jq로 파일에서 직접 읽기 (bash 변수 파싱 문제 완전 회피)
+          SHOULD_CREATE=$(jq -r '.should_create_issue // true' /tmp/analysis.json)
           echo "should_create=$SHOULD_CREATE" >> $GITHUB_OUTPUT
-          
 
       - name: Create GitHub Issue
         if: |
@@ -120,15 +119,15 @@ jobs:
         run: |
           LATEST_TAG="${{ steps.check_version.outputs.latest_tag }}"
           LATEST_DATE="${{ steps.check_version.outputs.latest_date }}"
-          ANALYSIS='${{ steps.analyze.outputs.analysis }}'
-
-          SUMMARY=$(echo "$ANALYSIS" | jq -r '.summary // "분석 결과 없음"')
-          BREAKING=$(echo "$ANALYSIS" | jq -r '.breaking_changes // "없음"')
-          FEATURES=$(echo "$ANALYSIS" | jq -r '.new_features // [] | if type == "array" and length > 0 then map("- " + .) | join("\n") else "없음" end')
-          SECURITY=$(echo "$ANALYSIS" | jq -r '.security // "없음"')
-          ACTION=$(echo "$ANALYSIS" | jq -r '.action_required // "없음"')
-          CATEGORIES=$(echo "$ANALYSIS" | jq -r '.categories // [] | join(", ")')
           RELEASE_DATE=$(echo "$LATEST_DATE" | cut -c1-10)
+
+          # analysis도 파일에서 직접 읽기
+          SUMMARY=$(jq -r '.summary // "분석 결과 없음"' /tmp/analysis.json)
+          BREAKING=$(jq -r '.breaking_changes // "없음"' /tmp/analysis.json)
+          FEATURES=$(jq -r '.new_features // [] | if type == "array" and length > 0 then map("- " + .) | join("\n") else "없음" end' /tmp/analysis.json)
+          SECURITY=$(jq -r '.security // "없음"' /tmp/analysis.json)
+          ACTION=$(jq -r '.action_required // "없음"' /tmp/analysis.json)
+          CATEGORIES=$(jq -r '.categories // [] | join(", ")' /tmp/analysis.json)
 
           cat > /tmp/issue_body.md << ISSUEBODY
           ## 📦 Claude Code ${LATEST_TAG} 업데이트
