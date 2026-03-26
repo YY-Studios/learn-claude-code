@@ -105,6 +105,10 @@ export default defineConfig({
     },
   },
 
+  sitemap: {
+    hostname: 'https://learn-claude-code-neon.vercel.app'
+  },
+
   markdown: {
     lineNumbers: true,
   },
