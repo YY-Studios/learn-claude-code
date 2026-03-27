@@ -1,6 +1,6 @@
 ---
 title: Supabase 프론트엔드 훅 생성 패턴
-description: @supabase/ssr 미사용 수동 훅 패턴. React Query와 Supabase 클라이언트를 활용한 커스텀 훅 작성법.
+description: supabase/ssr 미사용 수동 훅 패턴. React Query와 Supabase 클라이언트를 활용한 커스텀 훅 작성법.
 ---
 
 # 프론트엔드 훅 생성 패턴
