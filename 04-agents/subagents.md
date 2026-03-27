@@ -1,3 +1,8 @@
+---
+title: Subagents - 역할 분리와 병렬 처리
+description: 여러 AI 에이전트에게 역할을 나눠 병렬 처리. 코드 리뷰, 테스트, 문서화 에이전트 분리 패턴.
+---
+
 # Subagents (역할 분리 & 병렬 처리)
 
 > Subagent는 **Claude Code v1.x 이상**에서 지원되는 공식 기능입니다.

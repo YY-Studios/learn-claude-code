@@ -1,3 +1,8 @@
+---
+title: 효과적인 지시 패턴 - think hard 활용법
+description: Claude에게 더 나은 답변을 이끌어내는 프롬프트 패턴. think hard, 단계별 지시, 명확한 제약 조건 설정법.
+---
+
 # 효과적인 프롬프트 패턴과 실전 활용 팁 (Dos and Don'ts)
 
 Claude Code를 더욱 안전하고, 저렴하고, 똑똑하게 활용하기 위한 실전 노하우와 프롬프트 패턴을 소개합니다.

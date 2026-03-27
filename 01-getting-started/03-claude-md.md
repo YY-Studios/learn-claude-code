@@ -1,3 +1,8 @@
+---
+title: .claude/rules/ 경로별 규칙 설정 가이드
+description: CLAUDE.md를 여러 파일로 분리해 토큰 절약하기. paths 설정으로 조건부 로드, 폴더별 다른 규칙 적용 방법.
+---
+
 # 프로젝트 초기 세팅과 컨텍스트 관리 (CLAUDE.md)
 
 AI 에이전트를 활용할 때 가장 주의해야 할 점은 **컨텍스트 오버플로우와 환각(Hallucination)**입니다. 이를 방지하는 핵심 도구가 바로 `claude.md` 파일입니다.

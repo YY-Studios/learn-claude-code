@@ -1,3 +1,8 @@
+---
+title: Claude Code 핵심 명령어 및 단축키
+description: 효율적인 토큰 관리를 위한 필수 슬래시 커맨드와 단축키. /context, /compact, Shift+Tab 플랜 모드 등 실전 활용법.
+---
+
 # 핵심 명령어 및 단축키 (Quick Reference)
 
 클로드 코드의 효율적인 토큰 관리와 작업 속도를 끌어올려 줄 필수 명령어 및 단축키 모음입니다.

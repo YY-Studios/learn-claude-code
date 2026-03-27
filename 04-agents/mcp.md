@@ -1,3 +1,8 @@
+---
+title: Claude Code MCP 연동 및 토큰 관리
+description: MCP 서버 연결, 토큰 소비 최적화, 불필요한 서버 비활성화. System Tools 토큰 절약 전략.
+---
+
 # MCP 연동 및 토큰 관리 전략
 
 MCP(Model Context Protocol)는 클로드 코드에 날개를 달아주는 외부 도구 연동 시스템입니다. 로컬 DB, 슬랙, 노션, 깃허브 등과 클로드를 직접 연결할 수 있습니다.

@@ -1,3 +1,8 @@
+---
+title: CLAUDE.md 템플릿 모음
+description: Next.js, Node.js, 컴포넌트 라이브러리별 CLAUDE.md 템플릿. 프로젝트 타입에 맞는 설명서 작성 시작점.
+---
+
 # CLAUDE.md 템플릿 모음
 
 복붙해서 바로 쓸 수 있는 CLAUDE.md 템플릿입니다. 프로젝트 성격에 맞는 것을 골라 `/init`으로 생성된 파일에 덮어쓰거나 직접 편집하세요.

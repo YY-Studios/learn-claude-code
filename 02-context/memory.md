@@ -1,3 +1,8 @@
+---
+title: Claude Code /memory 자동 메모리 시스템
+description: Claude가 학습한 내용을 자동으로 저장하고 로드하는 메모리 시스템. 세션 간 연속성 유지 및 컨텍스트 관리.
+---
+
 # 자동 메모리 시스템 (/memory)
 
 > 자동 메모리는 **Claude Code v2.1.59 이상**에서 지원됩니다. `claude --version`으로 확인하세요.

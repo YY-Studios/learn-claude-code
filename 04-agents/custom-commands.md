@@ -1,3 +1,8 @@
+---
+title: Claude Code 커스텀 슬래시 명령어 만들기
+description: .claude/commands/ 폴더로 나만의 워크플로우 자동화. 반복 작업을 슬래시 커맨드로 모듈화하는 실전 패턴.
+---
+
 # 커스텀 슬래시 명령어 만들기 (.claude/commands)
 
 매번 반복하는 테스트, 포맷팅, 깃 커밋 과정을 아예 나만의 슬래시 명령어(Slash Command)로 모듈화하여 에이전트 파이프라인을 구축할 수 있습니다.

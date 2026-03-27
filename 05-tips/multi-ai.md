@@ -1,3 +1,8 @@
+---
+title: 다른 AI와 협업하기 - ChatGPT, Gemini 연동
+description: /export로 컨텍스트 내보내기. ChatGPT나 Gemini에게 피드백 받고 다시 Claude에게 전달하는 협업 패턴.
+---
+
 # 다른 AI와 협업 (Cross-AI Review)
 
 Claude Code와 핑퐁을 거듭하며 제자리걸음을 할 때가 있습니다. 억지로 계속 싸우지 말고 **다른 AI의 관점**을 빌려오세요.

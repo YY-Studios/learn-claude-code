@@ -1,3 +1,8 @@
+---
+title: Supabase RLS 정책 작성 패턴
+description: Row Level Security 정책 자동화. 보안 정책 템플릿, 역할별 접근 제어, 일반적인 RLS 실수 방지법.
+---
+
 # Supabase RLS 정책 작성 패턴
 
 RLS(Row Level Security)는 Supabase 보안의 핵심입니다. Claude Code에게 RLS 정책을 맡길 때는 **테이블 구조, 인증 방식, 접근 규칙**을 함께 명시해야 의도한 대로 작성해줍니다.

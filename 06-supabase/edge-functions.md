@@ -1,3 +1,8 @@
+---
+title: Supabase Edge Function 생성 패턴
+description: Claude Code로 Deno Edge Function 작성하기. 환경 제약 조건, 타입 정의, 에러 처리 실전 패턴.
+---
+
 # Supabase Edge Function 생성 패턴
 
 Claude Code로 Supabase Edge Function을 생성할 때, **Deno 런타임 환경**과 **배포 방식**을 명확히 명시하지 않으면 Node.js 스타일로 작성해버립니다. 제약 조건을 프롬프트에 명시하는 것이 핵심입니다.

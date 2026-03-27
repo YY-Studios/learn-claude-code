@@ -1,3 +1,8 @@
+---
+title: Claude Code 잘 되는 것 vs 안 되는 것
+description: Claude Code로 할 수 있는 것과 할 수 없는 것. 실전에서 겪는 일반적인 실수와 해결 방법, 효율적인 사용 팁.
+---
+
 # 잘 되는 것 & 안 되는 것 (Dos and Don'ts)
 
 ---

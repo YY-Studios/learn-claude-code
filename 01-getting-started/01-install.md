@@ -1,4 +1,9 @@
-# 설치 방법
+---
+title: Claude Code 설치 방법 (Windows, Mac, Linux)
+description: Claude Code 설치부터 초기 설정까지. Node.js 20+ 요구사항, 플랫폼별 설치 가이드, 로그인 및 첫 프로젝트 시작하기.
+---
+
+ 설치 방법
 
 > 📖 공식 문서: [code.claude.com/docs/ko](https://code.claude.com/docs/ko/overview)
 

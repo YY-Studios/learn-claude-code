@@ -1,3 +1,8 @@
+---
+title: WAT 프레임워크 개요 - Workflows · Agents · Tools
+description: Claude Code의 자동화 프레임워크 WAT 구조 이해하기. Workflows, Agents, Tools 개념과 실전 활용법.
+---
+
 # WAT 프레임워크 (Workflows, Agents, Tools)
 
 > ⚠️ **WAT 프레임워크는 공식 Anthropic 문서가 아니라 커뮤니티에서 정립된 아키텍처 패턴입니다.**  

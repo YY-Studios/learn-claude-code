@@ -1,3 +1,8 @@
+---
+title: CLAUDE.md 계층 구조와 우선순위
+description: CLAUDE.md, MEMORY.md, .claude/rules/ 로딩 순서와 충돌 해결 방법. 폴더별 분리와 Lazy Loading 전략.
+---
+
 # CLAUDE.md 계층 구조 및 지연 로딩 (Lazy Loading)
 
 프로젝트 규모가 커질수록 루트 `CLAUDE.md` 하나에 모든 API 스펙이나 DB 스키마를 넣으면, 매 세션마다 수천 토큰이 낭비됩니다.
