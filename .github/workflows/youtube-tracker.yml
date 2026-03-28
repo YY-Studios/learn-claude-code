@@ -186,6 +186,13 @@ jobs:
           print("분석 완료")
           PYEOF
 
+      - name: Ensure youtube-update label exists
+        if: steps.check_duplicate.outputs.has_new == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "youtube-update" --color "FF0000" --description "YouTube Claude Code 영상 업데이트" --repo "${{ github.repository }}" 2>/dev/null || true
+
       - name: Create GitHub Issue
         if: steps.check_duplicate.outputs.has_new == 'true'
         env:
