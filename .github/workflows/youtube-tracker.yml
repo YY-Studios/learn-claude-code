@@ -1,0 +1,228 @@
+name: YouTube Claude Code Tracker
+
+on:
+  schedule:
+    - cron: '0 9 */4 * *'
+  workflow_dispatch:
+
+jobs:
+  track-youtube:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - name: Fetch YouTube videos
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: |
+          curl -s \
+            "https://www.googleapis.com/youtube/v3/search?part=snippet&q=Claude+Code&type=video&order=viewCount&maxResults=5&key=$YOUTUBE_API_KEY" \
+            > /tmp/yt_search.json
+
+          echo "검색 완료: $(jq -r '.items | length' /tmp/yt_search.json)개 영상 수신"
+
+          # video ID 목록 추출 → 통계(조회수) 조회
+          VIDEO_IDS=$(jq -r '[.items[].id.videoId] | join(",")' /tmp/yt_search.json)
+
+          curl -s \
+            "https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=$VIDEO_IDS&key=$YOUTUBE_API_KEY" \
+            > /tmp/yt_videos.json
+
+          echo "통계 조회 완료"
+
+      - name: Build video list
+        id: build_list
+        run: |
+          python3 << 'PYEOF'
+          import json
+
+          with open("/tmp/yt_videos.json") as f:
+              data = json.load(f)
+
+          items = data.get("items", [])
+          videos = []
+          for item in items:
+              vid_id = item["id"]
+              snippet = item.get("snippet", {})
+              stats = item.get("statistics", {})
+              videos.append({
+                  "id": vid_id,
+                  "url": f"https://www.youtube.com/watch?v={vid_id}",
+                  "title": snippet.get("title", ""),
+                  "description": snippet.get("description", "")[:300],
+                  "channel": snippet.get("channelTitle", ""),
+                  "published": snippet.get("publishedAt", "")[:10],
+                  "views": int(stats.get("viewCount", 0)),
+              })
+
+          # 조회수 기준 정렬 (검색 API가 이미 정렬하지만 명시적으로 재정렬)
+          videos.sort(key=lambda v: v["views"], reverse=True)
+
+          with open("/tmp/videos.json", "w") as f:
+              json.dump(videos, f, ensure_ascii=False, indent=2)
+
+          print(f"처리 완료: {len(videos)}개")
+          for v in videos:
+              print(f"  - {v['title']} ({v['views']:,} views)")
+          PYEOF
+
+      - name: Check for duplicate issues
+        id: check_duplicate
+        run: |
+          python3 << 'PYEOF'
+          import json, urllib.request, os
+
+          token = os.environ.get("GITHUB_TOKEN", "")
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+
+          # 기존 youtube-update 라벨 이슈 목록 가져오기
+          url = f"https://api.github.com/repos/{repo}/issues?state=all&labels=youtube-update&per_page=100"
+          req = urllib.request.Request(url, headers={"Authorization": f"token {token}"})
+          with urllib.request.urlopen(req) as resp:
+              issues = json.load(resp)
+
+          existing_urls = set()
+          for issue in issues:
+              body = issue.get("body", "") or ""
+              for line in body.splitlines():
+                  if "youtube.com/watch?v=" in line:
+                      # URL 파싱
+                      start = line.find("https://www.youtube.com/watch?v=")
+                      if start != -1:
+                          url_part = line[start:].split()[0].rstrip(")")
+                          existing_urls.add(url_part)
+
+          with open("/tmp/videos.json") as f:
+              videos = json.load(f)
+
+          new_videos = [v for v in videos if v["url"] not in existing_urls]
+
+          with open("/tmp/new_videos.json", "w") as f:
+              json.dump(new_videos, f, ensure_ascii=False, indent=2)
+
+          print(f"전체: {len(videos)}개 | 신규: {len(new_videos)}개 | 중복 스킵: {len(videos) - len(new_videos)}개")
+          print("has_new=" + ("true" if new_videos else "false"))
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"has_new={'true' if new_videos else 'false'}\n")
+          PYEOF
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_OUTPUT: ${{ github.output }}
+
+      - name: Analyze with GPT-4o
+        id: analyze
+        if: steps.check_duplicate.outputs.has_new == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python3 << 'PYEOF'
+          import json, os
+
+          with open("/tmp/new_videos.json") as f:
+              videos = json.load(f)
+
+          video_text = "\n\n".join([
+              f"[{i+1}] {v['title']}\n채널: {v['channel']} | 게시일: {v['published']} | 조회수: {v['views']:,}\nURL: {v['url']}\n설명: {v['description']}"
+              for i, v in enumerate(videos)
+          ])
+
+          prompt = {
+              "model": "gpt-4o",
+              "max_tokens": 2000,
+              "messages": [
+                  {
+                      "role": "system",
+                      "content": "당신은 YouTube 영상을 분석하는 전문가입니다. 반드시 순수 JSON만 반환하고 마크다운 코드블록이나 설명 텍스트는 절대 포함하지 마세요."
+                  },
+                  {
+                      "role": "user",
+                      "content": f"다음 Claude Code 관련 YouTube 영상들을 분석해주세요.\n\n{video_text}\n\n각 영상에 대해 한국어로 2~3줄 요약과 주요 내용 태그를 추출해 주세요.\n\nJSON 형식으로만 반환: {{\"videos\": [{{\"title\": \"원제목\", \"url\": \"URL\", \"summary\": \"한국어 2~3줄 요약\", \"tags\": [\"태그1\", \"태그2\"]}}]}}"
+                  }
+              ]
+          }
+
+          with open("/tmp/yt_prompt.json", "w") as f:
+              json.dump(prompt, f, ensure_ascii=False)
+
+          print("프롬프트 생성 완료")
+          PYEOF
+
+          RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -d @/tmp/yt_prompt.json)
+
+          echo "=== API 응답 ==="
+          echo "$RESPONSE"
+
+          echo "$RESPONSE" | jq -r '.choices[0].message.content' > /tmp/yt_analysis.json
+          sed -i 's/^```json//;s/^```//' /tmp/yt_analysis.json
+
+          echo "analysis<<EOF" >> $GITHUB_OUTPUT
+          cat /tmp/yt_analysis.json >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Issue
+        if: steps.check_duplicate.outputs.has_new == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 << 'PYEOF'
+          import json, subprocess, datetime
+
+          with open("/tmp/new_videos.json") as f:
+              videos = json.load(f)
+
+          try:
+              with open("/tmp/yt_analysis.json") as f:
+                  analysis = json.load(f)
+              analyzed = {v["url"]: v for v in analysis.get("videos", [])}
+          except Exception:
+              analyzed = {}
+
+          today = datetime.date.today().isoformat()
+          count = len(videos)
+
+          lines = [
+              f"## 📺 Claude Code YouTube 영상 업데이트 ({today})",
+              f"\n조회수 상위 {count}개 신규 영상이 감지되었습니다.\n",
+          ]
+
+          for i, v in enumerate(videos, 1):
+              info = analyzed.get(v["url"], {})
+              summary = info.get("summary", "요약 없음")
+              tags = ", ".join(info.get("tags", []))
+              lines += [
+                  f"### {i}. {v['title']}",
+                  f"- **채널**: {v['channel']}",
+                  f"- **게시일**: {v['published']}",
+                  f"- **조회수**: {v['views']:,}",
+                  f"- **URL**: {v['url']}",
+                  f"- **태그**: {tags}" if tags else "",
+                  f"\n{summary}\n",
+              ]
+
+          lines += ["---", "이 이슈는 GitHub Actions가 자동 생성했습니다."]
+
+          body = "\n".join(l for l in lines if l is not None)
+
+          with open("/tmp/yt_issue_body.md", "w") as f:
+              f.write(body)
+
+          print("이슈 본문 생성 완료")
+          PYEOF
+
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "📺 Claude Code YouTube 영상 업데이트 ($(date '+%Y-%m-%d'))" \
+            --body-file /tmp/yt_issue_body.md \
+            --label "youtube-update"
+
+      - name: Skip log
+        if: steps.check_duplicate.outputs.has_new == 'false'
+        run: |
+          echo "⏭️ 신규 영상 없음. 모든 영상이 이미 이슈에 등록되어 있습니다."
