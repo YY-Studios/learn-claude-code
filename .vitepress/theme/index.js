@@ -5,7 +5,7 @@ import { inject } from '@vercel/analytics'
 import { defineComponent, h, onMounted } from 'vue'
 import { useData } from 'vitepress'
 
-const SUPPORTED_LANGS = ['en', 'ja', 'zh']
+const SUPPORTED_LANGS = ['en', 'ja']
 
 const Layout = defineComponent({
   setup() {
