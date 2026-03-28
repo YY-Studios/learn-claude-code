@@ -2,7 +2,7 @@ name: YouTube Claude Code Tracker
 
 on:
   schedule:
-    - cron: '0 9 */4 * *'
+    - cron: "0 9 */4 * *"
   workflow_dispatch:
 
 jobs:
@@ -113,58 +113,78 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_OUTPUT: ${{ github.output }}
 
-      - name: Analyze with GPT-4o
+      - name: Analyze with Gemini
         id: analyze
         if: steps.check_duplicate.outputs.has_new == 'true'
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python3 << 'PYEOF'
-          import json, os
+          import json, os, urllib.request
+
+          api_key = os.environ["GEMINI_API_KEY"]
 
           with open("/tmp/new_videos.json") as f:
               videos = json.load(f)
 
-          video_text = "\n\n".join([
-              f"[{i+1}] {v['title']}\n채널: {v['channel']} | 게시일: {v['published']} | 조회수: {v['views']:,}\nURL: {v['url']}\n설명: {v['description']}"
-              for i, v in enumerate(videos)
-          ])
+          results = []
+          for v in videos:
+              # Gemini는 YouTube URL을 fileData로 직접 처리 가능
+              payload = {
+                  "contents": [{
+                      "parts": [
+                          {
+                              "fileData": {
+                                  "mimeType": "video/*",
+                                  "fileUri": v["url"]
+                              }
+                          },
+                          {
+                              "text": (
+                                  "이 YouTube 영상을 한국어로 분석해주세요.\n"
+                                  "반드시 순수 JSON만 반환하고 마크다운 코드블록이나 설명 텍스트는 절대 포함하지 마세요.\n"
+                                  f"JSON 형식: {{\"summary\": \"2~3줄 한국어 요약\", \"tags\": [\"태그1\", \"태그2\"]}}"
+                              )
+                          }
+                      ]
+                  }],
+                  "generationConfig": {"temperature": 0.3}
+              }
 
-          prompt = {
-              "model": "gpt-4o",
-              "max_tokens": 2000,
-              "messages": [
-                  {
-                      "role": "system",
-                      "content": "당신은 YouTube 영상을 분석하는 전문가입니다. 반드시 순수 JSON만 반환하고 마크다운 코드블록이나 설명 텍스트는 절대 포함하지 마세요."
-                  },
-                  {
-                      "role": "user",
-                      "content": f"다음 Claude Code 관련 YouTube 영상들을 분석해주세요.\n\n{video_text}\n\n각 영상에 대해 한국어로 2~3줄 요약과 주요 내용 태그를 추출해 주세요.\n\nJSON 형식으로만 반환: {{\"videos\": [{{\"title\": \"원제목\", \"url\": \"URL\", \"summary\": \"한국어 2~3줄 요약\", \"tags\": [\"태그1\", \"태그2\"]}}]}}"
-                  }
-              ]
-          }
+              url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+              req = urllib.request.Request(
+                  url,
+                  data=json.dumps(payload).encode(),
+                  headers={"Content-Type": "application/json"},
+                  method="POST"
+              )
 
-          with open("/tmp/yt_prompt.json", "w") as f:
-              json.dump(prompt, f, ensure_ascii=False)
+              try:
+                  with urllib.request.urlopen(req) as resp:
+                      data = json.load(resp)
+                  raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                  if raw.startswith("```"):
+                      raw = "\n".join(raw.splitlines()[1:])
+                  if raw.endswith("```"):
+                      raw = "\n".join(raw.splitlines()[:-1])
+                  parsed = json.loads(raw)
+              except Exception as e:
+                  print(f"[WARN] {v['url']} 분석 실패: {e}")
+                  parsed = {"summary": "요약 없음", "tags": []}
 
-          print("프롬프트 생성 완료")
+              results.append({
+                  "title": v["title"],
+                  "url": v["url"],
+                  "summary": parsed.get("summary", "요약 없음"),
+                  "tags": parsed.get("tags", []),
+              })
+              print(f"  ✅ {v['title']}")
+
+          with open("/tmp/yt_analysis.json", "w") as f:
+              json.dump({"videos": results}, f, ensure_ascii=False, indent=2)
+
+          print("분석 완료")
           PYEOF
-
-          RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $OPENAI_API_KEY" \
-            -d @/tmp/yt_prompt.json)
-
-          echo "=== API 응답 ==="
-          echo "$RESPONSE"
-
-          echo "$RESPONSE" | jq -r '.choices[0].message.content' > /tmp/yt_analysis.json
-          sed -i 's/^```json//;s/^```//' /tmp/yt_analysis.json
-
-          echo "analysis<<EOF" >> $GITHUB_OUTPUT
-          cat /tmp/yt_analysis.json >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Issue
         if: steps.check_duplicate.outputs.has_new == 'true'
