@@ -2,7 +2,7 @@ name: YouTube Claude Code Tracker
 
 on:
   schedule:
-    - cron: '0 9 */4 * *'
+    - cron: "0 9 */4 * *"
   workflow_dispatch:
 
 jobs:
@@ -163,7 +163,6 @@ jobs:
                   with urllib.request.urlopen(req) as resp:
                       data = json.load(resp)
                   raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                  # 코드블록 감싸진 경우 제거
                   if raw.startswith("```"):
                       raw = "\n".join(raw.splitlines()[1:])
                   if raw.endswith("```"):
