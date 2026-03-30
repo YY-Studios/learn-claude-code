@@ -17,36 +17,68 @@ jobs:
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: |
+          # 5일 전 날짜 계산 (RFC 3339)
+          PUBLISHED_AFTER=$(date -u -d '5 days ago' '+%Y-%m-%dT%H:%M:%SZ')
+          echo "publishedAfter: $PUBLISHED_AFTER"
+
+          # 길이 필터 후 3개 확보를 위해 여유분 포함 10개 검색
           curl -s \
-            "https://www.googleapis.com/youtube/v3/search?part=snippet&q=Claude+Code&type=video&order=viewCount&maxResults=5&key=$YOUTUBE_API_KEY" \
+            "https://www.googleapis.com/youtube/v3/search?part=snippet&q=Claude+Code&type=video&order=viewCount&maxResults=10&publishedAfter=$PUBLISHED_AFTER&key=$YOUTUBE_API_KEY" \
             > /tmp/yt_search.json
 
           echo "검색 완료: $(jq -r '.items | length' /tmp/yt_search.json)개 영상 수신"
 
-          # video ID 목록 추출 → 통계(조회수) 조회
+          # video ID 목록 추출 → 통계(조회수) + contentDetails(길이) 조회
           VIDEO_IDS=$(jq -r '[.items[].id.videoId] | join(",")' /tmp/yt_search.json)
 
           curl -s \
-            "https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=$VIDEO_IDS&key=$YOUTUBE_API_KEY" \
+            "https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=$VIDEO_IDS&key=$YOUTUBE_API_KEY" \
             > /tmp/yt_videos.json
 
-          echo "통계 조회 완료"
+          echo "통계/길이 조회 완료"
 
       - name: Build video list
         id: build_list
         run: |
           python3 << 'PYEOF'
-          import json
+          import json, re
+
+          def parse_duration(iso):
+              """ISO 8601 duration → 초 (PT1H2M3S → 3723)"""
+              m = re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', iso or '')
+              if not m:
+                  return 0
+              h, mi, s = (int(x or 0) for x in m.groups())
+              return h * 3600 + mi * 60 + s
+
+          def fmt_duration(secs):
+              """초 → '12분 30초' 형식"""
+              m, s = divmod(secs, 60)
+              h, m = divmod(m, 60)
+              if h:
+                  return f"{h}시간 {m}분"
+              return f"{m}분 {s}초" if s else f"{m}분"
 
           with open("/tmp/yt_videos.json") as f:
               data = json.load(f)
 
           items = data.get("items", [])
           videos = []
+          skipped = []
+
           for item in items:
               vid_id = item["id"]
               snippet = item.get("snippet", {})
               stats = item.get("statistics", {})
+              content = item.get("contentDetails", {})
+              duration_iso = content.get("duration", "")
+              duration_sec = parse_duration(duration_iso)
+
+              # 길이 필터: 3분(180초) 이상, 40분(2400초) 이하
+              if not (180 <= duration_sec <= 2400):
+                  skipped.append(f"{snippet.get('title', vid_id)} ({fmt_duration(duration_sec)})")
+                  continue
+
               videos.append({
                   "id": vid_id,
                   "url": f"https://www.youtube.com/watch?v={vid_id}",
@@ -55,17 +87,23 @@ jobs:
                   "channel": snippet.get("channelTitle", ""),
                   "published": snippet.get("publishedAt", "")[:10],
                   "views": int(stats.get("viewCount", 0)),
+                  "duration_sec": duration_sec,
+                  "duration_fmt": fmt_duration(duration_sec),
               })
 
-          # 조회수 기준 정렬 (검색 API가 이미 정렬하지만 명시적으로 재정렬)
+          # 조회수 기준 정렬 후 상위 3개
           videos.sort(key=lambda v: v["views"], reverse=True)
+          videos = videos[:3]
 
           with open("/tmp/videos.json", "w") as f:
               json.dump(videos, f, ensure_ascii=False, indent=2)
 
-          print(f"처리 완료: {len(videos)}개")
+          print(f"길이 필터 제외: {len(skipped)}개")
+          for s in skipped:
+              print(f"  ✗ {s}")
+          print(f"통과: {len(videos)}개")
           for v in videos:
-              print(f"  - {v['title']} ({v['views']:,} views)")
+              print(f"  ✓ {v['title']} ({v['duration_fmt']}, {v['views']:,} views)")
           PYEOF
 
       - name: Check for duplicate issues
@@ -88,7 +126,6 @@ jobs:
               body = issue.get("body", "") or ""
               for line in body.splitlines():
                   if "youtube.com/watch?v=" in line:
-                      # URL 파싱
                       start = line.find("https://www.youtube.com/watch?v=")
                       if start != -1:
                           url_part = line[start:].split()[0].rstrip(")")
@@ -103,7 +140,6 @@ jobs:
               json.dump(new_videos, f, ensure_ascii=False, indent=2)
 
           print(f"전체: {len(videos)}개 | 신규: {len(new_videos)}개 | 중복 스킵: {len(videos) - len(new_videos)}개")
-          print("has_new=" + ("true" if new_videos else "false"))
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"has_new={'true' if new_videos else 'false'}\n")
@@ -111,7 +147,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_OUTPUT: ${{ github.output }}
 
       - name: Analyze with Gemini
         id: analyze
@@ -127,9 +162,27 @@ jobs:
           with open("/tmp/new_videos.json") as f:
               videos = json.load(f)
 
+          def gemini_request(payload):
+              url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+              req = urllib.request.Request(
+                  url,
+                  data=json.dumps(payload).encode(),
+                  headers={"Content-Type": "application/json"},
+                  method="POST"
+              )
+              with urllib.request.urlopen(req) as resp:
+                  data = json.load(resp)
+              raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+              # 코드블록 제거
+              if raw.startswith("```"):
+                  raw = "\n".join(raw.splitlines()[1:])
+              if raw.endswith("```"):
+                  raw = "\n".join(raw.splitlines()[:-1])
+              return raw
+
+          # ── 개별 영상 분석 ──────────────────────────────────────────
           results = []
           for v in videos:
-              # Gemini는 YouTube URL을 fileData로 직접 처리 가능
               payload = {
                   "contents": [{
                       "parts": [
@@ -143,7 +196,8 @@ jobs:
                               "text": (
                                   "이 YouTube 영상을 한국어로 분석해주세요.\n"
                                   "반드시 순수 JSON만 반환하고 마크다운 코드블록이나 설명 텍스트는 절대 포함하지 마세요.\n"
-                                  f"JSON 형식: {{\"summary\": \"2~3줄 한국어 요약\", \"tags\": [\"태그1\", \"태그2\"]}}"
+                                  "summary 값은 마크다운 형식으로 작성하세요 (bold, bullet 등 활용).\n"
+                                  '예시: {"summary": "**핵심 내용**: ...\n- 포인트1\n- 포인트2", "tags": ["태그1", "태그2"]}'
                               )
                           }
                       ]
@@ -151,22 +205,8 @@ jobs:
                   "generationConfig": {"temperature": 0.3}
               }
 
-              url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-              req = urllib.request.Request(
-                  url,
-                  data=json.dumps(payload).encode(),
-                  headers={"Content-Type": "application/json"},
-                  method="POST"
-              )
-
               try:
-                  with urllib.request.urlopen(req) as resp:
-                      data = json.load(resp)
-                  raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                  if raw.startswith("```"):
-                      raw = "\n".join(raw.splitlines()[1:])
-                  if raw.endswith("```"):
-                      raw = "\n".join(raw.splitlines()[:-1])
+                  raw = gemini_request(payload)
                   parsed = json.loads(raw)
               except Exception as e:
                   print(f"[WARN] {v['url']} 분석 실패: {e}")
@@ -180,8 +220,39 @@ jobs:
               })
               print(f"  ✅ {v['title']}")
 
+          # ── 총 요약 ────────────────────────────────────────────────
+          summary_text = "\n\n".join([
+              f"[{r['title']}]\n{r['summary']}"
+              for r in results
+          ])
+
+          total_payload = {
+              "contents": [{
+                  "parts": [{
+                      "text": (
+                          "다음은 최근 Claude Code 관련 YouTube 영상들의 개별 요약입니다.\n\n"
+                          f"{summary_text}\n\n"
+                          "위 영상들을 종합해서 '이번 기간 Claude Code 관련 유튜브 트렌드'를 "
+                          "한국어 마크다운 형식으로 3~5줄 요약해주세요. "
+                          "공통 주제, 주목할 트렌드, 학습 포인트를 포함하세요. "
+                          "순수 마크다운 텍스트만 반환하고 JSON이나 코드블록은 사용하지 마세요."
+                      )
+                  }]
+              }],
+              "generationConfig": {"temperature": 0.4}
+          }
+
+          try:
+              total_summary = gemini_request(total_payload)
+          except Exception as e:
+              print(f"[WARN] 총 요약 실패: {e}")
+              total_summary = "총 요약을 생성할 수 없습니다."
+
           with open("/tmp/yt_analysis.json", "w") as f:
-              json.dump({"videos": results}, f, ensure_ascii=False, indent=2)
+              json.dump({
+                  "videos": results,
+                  "total_summary": total_summary
+              }, f, ensure_ascii=False, indent=2)
 
           print("분석 완료")
           PYEOF
@@ -199,7 +270,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 << 'PYEOF'
-          import json, subprocess, datetime
+          import json, datetime
 
           with open("/tmp/new_videos.json") as f:
               videos = json.load(f)
@@ -208,16 +279,28 @@ jobs:
               with open("/tmp/yt_analysis.json") as f:
                   analysis = json.load(f)
               analyzed = {v["url"]: v for v in analysis.get("videos", [])}
+              total_summary = analysis.get("total_summary", "")
           except Exception:
               analyzed = {}
+              total_summary = ""
 
           today = datetime.date.today().isoformat()
           count = len(videos)
 
           lines = [
               f"## 📺 Claude Code YouTube 영상 업데이트 ({today})",
-              f"\n조회수 상위 {count}개 신규 영상이 감지되었습니다.\n",
+              f"\n조회수 상위 {count}개 신규 영상 (최근 5일 이내, 3~40분)\n",
           ]
+
+          if total_summary:
+              lines += [
+                  "## 🗂️ 총 요약",
+                  "",
+                  total_summary,
+                  "",
+                  "---",
+                  "",
+              ]
 
           for i, v in enumerate(videos, 1):
               info = analyzed.get(v["url"], {})
@@ -228,9 +311,12 @@ jobs:
                   f"- **채널**: {v['channel']}",
                   f"- **게시일**: {v['published']}",
                   f"- **조회수**: {v['views']:,}",
+                  f"- **길이**: {v.get('duration_fmt', '-')}",
                   f"- **URL**: {v['url']}",
                   f"- **태그**: {tags}" if tags else "",
-                  f"\n{summary}\n",
+                  "",
+                  summary,
+                  "",
               ]
 
           lines += ["---", "이 이슈는 GitHub Actions가 자동 생성했습니다."]
