@@ -15,71 +15,73 @@ jobs:
       GEMINI_MODEL: gemini-2.5-flash
 
     steps:
-      - name: Fetch Reddit RSS
+      - name: Fetch Reddit JSON
         run: |
-          # r/ClaudeAI RSS
-          curl -s \
-            "https://www.reddit.com/r/ClaudeAI/search.rss?q=Claude+Code&sort=new&restrict_sr=1&limit=15" \
-            -A "Mozilla/5.0" \
-            > /tmp/reddit_claudeai.xml
+          # r/ClaudeAI JSON API
+          curl -s --max-time 30 \
+            "https://www.reddit.com/r/ClaudeAI/search.json?q=Claude+Code&sort=new&restrict_sr=1&limit=15&t=week" \
+            -H "Accept: application/json" \
+            -A "Mozilla/5.0 (compatible; GithubActions)" \
+            > /tmp/reddit_claudeai.json
 
-          # r/ChatGPTCoding RSS
-          curl -s \
-            "https://www.reddit.com/r/ChatGPTCoding/search.rss?q=Claude+Code&sort=new&restrict_sr=1&limit=15" \
-            -A "Mozilla/5.0" \
-            > /tmp/reddit_chatgptcoding.xml
+          # r/ChatGPTCoding JSON API
+          curl -s --max-time 30 \
+            "https://www.reddit.com/r/ChatGPTCoding/search.json?q=Claude+Code&sort=new&restrict_sr=1&limit=15&t=week" \
+            -H "Accept: application/json" \
+            -A "Mozilla/5.0 (compatible; GithubActions)" \
+            > /tmp/reddit_chatgptcoding.json
 
-          echo "Reddit RSS 수신 완료"
+          echo "r/ClaudeAI: $(jq -r '.data.children | length // "에러"' /tmp/reddit_claudeai.json 2>/dev/null)개"
+          echo "r/ChatGPTCoding: $(jq -r '.data.children | length // "에러"' /tmp/reddit_chatgptcoding.json 2>/dev/null)개"
 
       - name: Fetch Hacker News
         run: |
-          # HN Search API - 최근 5일 이내 "Claude Code" 언급
+          # HN Search API - 최근 5일 이내 "Claude Code" 언급 (> → %3E 인코딩)
           PUBLISHED_AFTER=$(date -u -d '5 days ago' '+%s')
+          echo "publishedAfter: $PUBLISHED_AFTER"
 
-          curl -s \
-            "https://hn.algolia.com/api/v1/search?query=Claude+Code&tags=story&numericFilters=created_at_i>${PUBLISHED_AFTER}&hitsPerPage=15" \
+          curl -s --max-time 30 \
+            "https://hn.algolia.com/api/v1/search?query=Claude+Code&tags=story&numericFilters=created_at_i%3E${PUBLISHED_AFTER}&hitsPerPage=15" \
             > /tmp/hn_results.json
 
-          echo "HN 수신 완료: $(jq -r '.hits | length' /tmp/hn_results.json)개"
+          echo "HN: $(jq -r '.hits | length // "에러"' /tmp/hn_results.json 2>/dev/null)개"
 
       - name: Parse and build post list
         id: build_list
         run: |
           python3 << 'PYEOF'
-          import json, xml.etree.ElementTree as ET, datetime, re
+          import json, datetime, re
 
           posts = []
           cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=5)
 
-          # ── Reddit 파싱 ──────────────────────────────────────────
-          NS = {"atom": "http://www.w3.org/2005/Atom"}
-
+          # ── Reddit JSON 파싱 ─────────────────────────────────────
           for fname, source in [
-              ("/tmp/reddit_claudeai.xml", "r/ClaudeAI"),
-              ("/tmp/reddit_chatgptcoding.xml", "r/ChatGPTCoding"),
+              ("/tmp/reddit_claudeai.json", "r/ClaudeAI"),
+              ("/tmp/reddit_chatgptcoding.json", "r/ChatGPTCoding"),
           ]:
               try:
-                  tree = ET.parse(fname)
-                  root = tree.getroot()
-                  for entry in root.findall("atom:entry", NS):
-                      title   = entry.findtext("atom:title", "", NS).strip()
-                      link    = entry.find("atom:link", NS)
-                      url     = link.attrib.get("href", "") if link is not None else ""
-                      updated = entry.findtext("atom:updated", "", NS)
-                      content = entry.findtext("atom:content", "", NS)
-                      try:
-                          pub = datetime.datetime.fromisoformat(updated.replace("Z", "+00:00"))
-                          if pub < cutoff:
-                              continue
-                      except Exception:
-                          pass
-                      snippet = re.sub(r'<[^>]+>', '', content or '')[:300].strip()
+                  with open(fname) as f:
+                      data = json.load(f)
+                  children = data.get("data", {}).get("children", [])
+                  for child in children:
+                      p = child.get("data", {})
+                      created = p.get("created_utc", 0)
+                      pub = datetime.datetime.fromtimestamp(created, tz=datetime.timezone.utc)
+                      if pub < cutoff:
+                          continue
+                      title   = p.get("title", "").strip()
+                      url     = p.get("url", "")
+                      # 외부 링크면 permalink를 URL로 사용
+                      if not url.startswith("https://www.reddit.com"):
+                          url = f"https://www.reddit.com{p.get('permalink', '')}"
+                      snippet = re.sub(r'<[^>]+>', '', p.get("selftext", "") or '')[:300].strip()
                       posts.append({
                           "source": source,
                           "title": title,
                           "url": url,
                           "snippet": snippet,
-                          "published": updated[:10],
+                          "published": pub.strftime("%Y-%m-%d"),
                       })
               except Exception as e:
                   print(f"[WARN] {fname} 파싱 실패: {e}")
