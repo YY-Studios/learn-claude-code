@@ -183,25 +183,19 @@ jobs:
           # ── 개별 영상 분석 ──────────────────────────────────────────
           results = []
           for v in videos:
+              prompt = (
+                  f"다음 YouTube 영상 정보를 한국어로 분석해주세요.\n\n"
+                  f"제목: {v['title']}\n"
+                  f"채널: {v['channel']}\n"
+                  f"길이: {v['duration_fmt']}\n"
+                  f"설명: {v['description']}\n\n"
+                  "반드시 순수 JSON만 반환하고 마크다운 코드블록이나 설명 텍스트는 절대 포함하지 마세요.\n"
+                  "summary 값은 마크다운 형식으로 작성하세요 (bold, bullet 등 활용).\n"
+                  '예시: {"summary": "**핵심 내용**: ...\\n- 포인트1\\n- 포인트2", "tags": ["태그1", "태그2"]}'
+              )
+
               payload = {
-                  "contents": [{
-                      "parts": [
-                          {
-                              "fileData": {
-                                  "mimeType": "video/*",
-                                  "fileUri": v["url"]
-                              }
-                          },
-                          {
-                              "text": (
-                                  "이 YouTube 영상을 한국어로 분석해주세요.\n"
-                                  "반드시 순수 JSON만 반환하고 마크다운 코드블록이나 설명 텍스트는 절대 포함하지 마세요.\n"
-                                  "summary 값은 마크다운 형식으로 작성하세요 (bold, bullet 등 활용).\n"
-                                  '예시: {"summary": "**핵심 내용**: ...\n- 포인트1\n- 포인트2", "tags": ["태그1", "태그2"]}'
-                              )
-                          }
-                      ]
-                  }],
+                  "contents": [{"parts": [{"text": prompt}]}],
                   "generationConfig": {"temperature": 0.3}
               }
 
@@ -209,7 +203,7 @@ jobs:
                   raw = gemini_request(payload)
                   parsed = json.loads(raw)
               except Exception as e:
-                  print(f"[WARN] {v['url']} 분석 실패: {e}")
+                  print(f"[WARN] {v['title']} 분석 실패: {e}")
                   parsed = {"summary": "요약 없음", "tags": []}
 
               results.append({
