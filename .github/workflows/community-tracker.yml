@@ -1,0 +1,363 @@
+name: Community Update Tracker
+
+on:
+  schedule:
+    - cron: "0 9 */4 * *"
+  workflow_dispatch:
+
+jobs:
+  track-community:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    env:
+      GEMINI_MODEL: gemini-2.5-flash
+
+    steps:
+      - name: Fetch Reddit RSS
+        run: |
+          # r/ClaudeAI RSS
+          curl -s \
+            "https://www.reddit.com/r/ClaudeAI/search.rss?q=Claude+Code&sort=new&restrict_sr=1&limit=15" \
+            -A "Mozilla/5.0" \
+            > /tmp/reddit_claudeai.xml
+
+          # r/ChatGPTCoding RSS
+          curl -s \
+            "https://www.reddit.com/r/ChatGPTCoding/search.rss?q=Claude+Code&sort=new&restrict_sr=1&limit=15" \
+            -A "Mozilla/5.0" \
+            > /tmp/reddit_chatgptcoding.xml
+
+          echo "Reddit RSS 수신 완료"
+
+      - name: Fetch Hacker News
+        run: |
+          # HN Search API - 최근 5일 이내 "Claude Code" 언급
+          PUBLISHED_AFTER=$(date -u -d '5 days ago' '+%s')
+
+          curl -s \
+            "https://hn.algolia.com/api/v1/search?query=Claude+Code&tags=story&numericFilters=created_at_i>${PUBLISHED_AFTER}&hitsPerPage=15" \
+            > /tmp/hn_results.json
+
+          echo "HN 수신 완료: $(jq -r '.hits | length' /tmp/hn_results.json)개"
+
+      - name: Parse and build post list
+        id: build_list
+        run: |
+          python3 << 'PYEOF'
+          import json, xml.etree.ElementTree as ET, datetime, re
+
+          posts = []
+          cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=5)
+
+          # ── Reddit 파싱 ──────────────────────────────────────────
+          NS = {"atom": "http://www.w3.org/2005/Atom"}
+
+          for fname, source in [
+              ("/tmp/reddit_claudeai.xml", "r/ClaudeAI"),
+              ("/tmp/reddit_chatgptcoding.xml", "r/ChatGPTCoding"),
+          ]:
+              try:
+                  tree = ET.parse(fname)
+                  root = tree.getroot()
+                  for entry in root.findall("atom:entry", NS):
+                      title   = entry.findtext("atom:title", "", NS).strip()
+                      link    = entry.find("atom:link", NS)
+                      url     = link.attrib.get("href", "") if link is not None else ""
+                      updated = entry.findtext("atom:updated", "", NS)
+                      content = entry.findtext("atom:content", "", NS)
+                      try:
+                          pub = datetime.datetime.fromisoformat(updated.replace("Z", "+00:00"))
+                          if pub < cutoff:
+                              continue
+                      except Exception:
+                          pass
+                      snippet = re.sub(r'<[^>]+>', '', content or '')[:300].strip()
+                      posts.append({
+                          "source": source,
+                          "title": title,
+                          "url": url,
+                          "snippet": snippet,
+                          "published": updated[:10],
+                      })
+              except Exception as e:
+                  print(f"[WARN] {fname} 파싱 실패: {e}")
+
+          # ── HN 파싱 ─────────────────────────────────────────────
+          try:
+              with open("/tmp/hn_results.json") as f:
+                  hn = json.load(f)
+              for hit in hn.get("hits", []):
+                  ts = hit.get("created_at", "")
+                  try:
+                      pub = datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                      if pub < cutoff:
+                          continue
+                  except Exception:
+                      pass
+                  # story_text는 Ask HN만 있음 → highlight 결과로 보완
+                  story_text = (hit.get("story_text") or "").strip()
+                  if not story_text:
+                      hl = hit.get("_highlightResult", {}).get("story_text", {})
+                      story_text = re.sub(r'<[^>]+>', '', hl.get("value", ""))[:300].strip()
+                  posts.append({
+                      "source": "Hacker News",
+                      "title": hit.get("title", ""),
+                      "url": hit.get("url") or f"https://news.ycombinator.com/item?id={hit.get('objectID','')}",
+                      "snippet": story_text,
+                      "published": ts[:10],
+                  })
+          except Exception as e:
+              print(f"[WARN] HN 파싱 실패: {e}")
+
+          # 중복 URL 제거 후 최대 10개
+          seen = set()
+          unique = []
+          for p in posts:
+              if p["url"] not in seen:
+                  seen.add(p["url"])
+                  unique.append(p)
+
+          unique = unique[:10]
+
+          with open("/tmp/posts.json", "w") as f:
+              json.dump(unique, f, ensure_ascii=False, indent=2)
+
+          print(f"수집 완료: {len(unique)}개 포스트")
+          for p in unique:
+              print(f"  [{p['source']}] {p['title']}")
+          PYEOF
+
+      - name: Check for duplicate issues
+        id: check_duplicate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 << 'PYEOF'
+          import json, urllib.request, os, re
+
+          token = os.environ["GITHUB_TOKEN"]
+          repo  = os.environ["GITHUB_REPOSITORY"]
+
+          url = f"https://api.github.com/repos/{repo}/issues?state=all&labels=community-update&per_page=100"
+          req = urllib.request.Request(url, headers={"Authorization": f"token {token}"})
+          with urllib.request.urlopen(req) as resp:
+              issues = json.load(resp)
+
+          existing_urls = set()
+          for issue in issues:
+              body = issue.get("body", "") or ""
+              for line in body.splitlines():
+                  found = re.findall(r'https?://\S+', line)
+                  for u in found:
+                      existing_urls.add(u.rstrip(")>\"'"))
+
+          with open("/tmp/posts.json") as f:
+              posts = json.load(f)
+
+          new_posts = [p for p in posts if p["url"] not in existing_urls]
+
+          with open("/tmp/new_posts.json", "w") as f:
+              json.dump(new_posts, f, ensure_ascii=False, indent=2)
+
+          print(f"전체: {len(posts)}개 | 신규: {len(new_posts)}개 | 중복 스킵: {len(posts)-len(new_posts)}개")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"has_new={'true' if new_posts else 'false'}\n")
+          PYEOF
+
+      - name: Analyze with Gemini
+        id: analyze
+        if: steps.check_duplicate.outputs.has_new == 'true'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python3 << 'PYEOF'
+          import json, os, re, urllib.request, urllib.error
+
+          api_key = os.environ["GEMINI_API_KEY"]
+          model   = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+
+          with open("/tmp/new_posts.json") as f:
+              posts = json.load(f)
+
+          def gemini_request(payload):
+              url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+              req = urllib.request.Request(
+                  url,
+                  data=json.dumps(payload).encode(),
+                  headers={"Content-Type": "application/json"},
+                  method="POST"
+              )
+              try:
+                  with urllib.request.urlopen(req) as resp:
+                      data = json.load(resp)
+              except urllib.error.HTTPError as e:
+                  body = e.read().decode("utf-8", errors="replace")
+                  raise RuntimeError(f"HTTP {e.code}: {body}") from e
+              return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+          # ── 개별 포스트 분석 ────────────────────────────────────
+          results = []
+          for p in posts:
+              prompt = (
+                  f"다음 커뮤니티 포스트를 분석해서 JSON으로 반환하세요.\n"
+                  f"출처: {p['source']}\n"
+                  f"제목: {p['title']}\n"
+                  f"내용: {p['snippet']}\n\n"
+                  "summary는 한국어 2~3문장, tags는 문자열 배열(최대 4개).\n"
+                  '형식: {"summary": "요약 내용", "tags": ["태그1", "태그2"]}'
+              )
+              payload = {
+                  "contents": [{"parts": [{"text": prompt}]}],
+                  "generationConfig": {
+                      "temperature": 0.2,
+                      "responseMimeType": "application/json"
+                  }
+              }
+              raw = ""
+              try:
+                  raw = gemini_request(payload)
+                  clean = re.sub(r'^```json\s*|```$', '', raw, flags=re.MULTILINE).strip()
+                  parsed = json.loads(clean)
+              except Exception as e:
+                  print(f"[WARN] {p['title']} 분석 실패: {e}\nRaw: {raw!r}")
+                  parsed = {"summary": "요약 없음", "tags": []}
+
+              results.append({
+                  "source":    p["source"],
+                  "title":     p["title"],
+                  "url":       p["url"],
+                  "published": p["published"],
+                  "summary":   parsed.get("summary", "요약 없음"),
+                  "tags":      parsed.get("tags", []),
+              })
+              print(f"  ✅ [{p['source']}] {p['title']}")
+
+          # ── 총 트렌드 요약 ──────────────────────────────────────
+          summary_text = "\n\n".join([
+              f"[{r['source']}] {r['title']}\n{r['summary']}"
+              for r in results
+          ])
+          total_payload = {
+              "contents": [{
+                  "parts": [{
+                      "text": (
+                          "다음은 최근 Claude Code 관련 커뮤니티(Reddit, Hacker News) 포스트 요약입니다.\n\n"
+                          f"{summary_text}\n\n"
+                          "위 내용을 종합해서 '이번 기간 Claude Code 커뮤니티 트렌드'를 "
+                          "한국어 마크다운으로 3~5줄 요약해주세요. "
+                          "공통 주제, 주목할 반응, 학습 포인트를 포함하세요. "
+                          "순수 마크다운 텍스트만 반환하고 JSON이나 코드블록은 사용하지 마세요."
+                      )
+                  }]
+              }],
+              "generationConfig": {"temperature": 0.2}
+          }
+          try:
+              total_summary = gemini_request(total_payload)
+          except Exception as e:
+              print(f"[WARN] 총 요약 실패: {e}")
+              total_summary = "총 요약을 생성할 수 없습니다."
+
+          with open("/tmp/community_analysis.json", "w") as f:
+              json.dump({"posts": results, "total_summary": total_summary}, f, ensure_ascii=False, indent=2)
+
+          print("분석 완료")
+          PYEOF
+
+      - name: Ensure community-update label exists
+        if: steps.check_duplicate.outputs.has_new == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "community-update" --color "0075ca" --description "Reddit/HN Claude Code 커뮤니티 업데이트" --repo "${{ github.repository }}" 2>/dev/null || true
+
+      - name: Create GitHub Issue
+        if: steps.check_duplicate.outputs.has_new == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 << 'PYEOF'
+          import json, datetime
+          from collections import defaultdict
+
+          with open("/tmp/new_posts.json") as f:
+              posts = json.load(f)
+
+          try:
+              with open("/tmp/community_analysis.json") as f:
+                  analysis = json.load(f)
+              analyzed      = {p["url"]: p for p in analysis.get("posts", [])}
+              total_summary = analysis.get("total_summary", "")
+          except Exception:
+              analyzed      = {}
+              total_summary = ""
+
+          today = datetime.date.today().isoformat()
+          count = len(posts)
+
+          lines = [
+              f"## 🌐 Claude Code 커뮤니티 업데이트 ({today})",
+              f"\nReddit / Hacker News 신규 포스트 {count}개 (최근 5일 이내)\n",
+          ]
+
+          if total_summary:
+              lines += [
+                  "## 🗂️ 트렌드 요약",
+                  "",
+                  total_summary,
+                  "",
+                  "---",
+                  "",
+              ]
+
+          source_emoji = {
+              "r/ClaudeAI": "🤖",
+              "r/ChatGPTCoding": "💻",
+              "Hacker News": "🔶",
+          }
+
+          grouped = defaultdict(list)
+          for p in posts:
+              grouped[p["source"]].append(p)
+
+          for source, items in grouped.items():
+              emoji = source_emoji.get(source, "📌")
+              lines += [f"## {emoji} {source}", ""]
+              for p in items:
+                  info    = analyzed.get(p["url"], {})
+                  summary = info.get("summary", "요약 없음")
+                  tags    = ", ".join(info.get("tags", []))
+                  lines += [
+                      f"### {p['title']}",
+                      f"- **게시일**: {p['published']}",
+                      f"- **URL**: {p['url']}",
+                      f"- **태그**: {tags}" if tags else "",
+                      "",
+                      summary,
+                      "",
+                  ]
+
+          lines += ["---", "이 이슈는 GitHub Actions가 자동 생성했습니다."]
+
+          body = "\n".join(l for l in lines if l is not None)
+
+          with open("/tmp/community_issue_body.md", "w") as f:
+              f.write(body)
+
+          print("이슈 본문 생성 완료")
+          PYEOF
+
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "🌐 Claude Code 커뮤니티 업데이트 ($(date '+%Y-%m-%d'))" \
+            --body-file /tmp/community_issue_body.md \
+            --label "community-update"
+
+      - name: Skip log
+        if: steps.check_duplicate.outputs.has_new == 'false'
+        run: |
+          echo "⏭️ 신규 포스트 없음. 모든 포스트가 이미 이슈에 등록되어 있습니다."
