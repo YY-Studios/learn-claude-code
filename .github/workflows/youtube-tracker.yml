@@ -12,7 +12,7 @@ jobs:
       issues: write
       contents: read
     env:
-      GEMINI_MODEL: gemini-1.5-flash
+      GEMINI_MODEL: gemini-2.0-flash
 
     steps:
       - name: Fetch YouTube videos
@@ -166,8 +166,8 @@ jobs:
 
           def gemini_request(payload):
               import urllib.error
-              model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
-              url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+              model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+              url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={api_key}"
               req = urllib.request.Request(
                   url,
                   data=json.dumps(payload).encode(),
