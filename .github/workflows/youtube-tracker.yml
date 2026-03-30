@@ -12,7 +12,7 @@ jobs:
       issues: write
       contents: read
     env:
-      GEMINI_MODEL: gemini-2.0-flash-001
+      GEMINI_MODEL: gemini-1.5-flash
 
     steps:
       - name: Fetch YouTube videos
@@ -157,7 +157,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python3 << 'PYEOF'
-          import json, os, urllib.request
+          import json, os, re, urllib.request
 
           api_key = os.environ["GEMINI_API_KEY"]
 
@@ -166,7 +166,7 @@ jobs:
 
           def gemini_request(payload):
               import urllib.error
-              model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash-001")
+              model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
               url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
               req = urllib.request.Request(
                   url,
@@ -180,37 +180,35 @@ jobs:
               except urllib.error.HTTPError as e:
                   body = e.read().decode("utf-8", errors="replace")
                   raise RuntimeError(f"HTTP {e.code}: {body}") from e
-              raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-              if raw.startswith("```"):
-                  raw = "\n".join(raw.splitlines()[1:])
-              if raw.endswith("```"):
-                  raw = "\n".join(raw.splitlines()[:-1])
-              return raw
+              return data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
           # ── 개별 영상 분석 ──────────────────────────────────────────
           results = []
           for v in videos:
               prompt = (
-                  f"다음 YouTube 영상 정보를 한국어로 분석해주세요.\n\n"
+                  f"YouTube 영상 정보를 분석하여 JSON으로 반환하세요.\n"
                   f"제목: {v['title']}\n"
                   f"채널: {v['channel']}\n"
                   f"길이: {v['duration_fmt']}\n"
                   f"설명: {v['description']}\n\n"
-                  "반드시 순수 JSON만 반환하고 마크다운 코드블록이나 설명 텍스트는 절대 포함하지 마세요.\n"
-                  "summary 값은 마크다운 형식으로 작성하세요 (bold, bullet 등 활용).\n"
-                  '예시: {"summary": "**핵심 내용**: ...\\n- 포인트1\\n- 포인트2", "tags": ["태그1", "태그2"]}'
+                  'summary는 한국어 마크다운(bold, bullet 활용), tags는 문자열 배열.\n'
+                  '형식: {"summary": "**핵심**: ...\\n- 포인트", "tags": ["태그1", "태그2"]}'
               )
 
               payload = {
                   "contents": [{"parts": [{"text": prompt}]}],
-                  "generationConfig": {"temperature": 0.3}
+                  "generationConfig": {
+                      "temperature": 0.2,
+                      "response_mime_type": "application/json"
+                  }
               }
 
               try:
                   raw = gemini_request(payload)
-                  parsed = json.loads(raw)
+                  clean = re.sub(r'^```json\s*|```$', '', raw, flags=re.MULTILINE).strip()
+                  parsed = json.loads(clean)
               except Exception as e:
-                  print(f"[WARN] {v['title']} 분석 실패: {e}")
+                  print(f"[WARN] {v['title']} 분석 실패: {e}\nRaw: {raw!r}")
                   parsed = {"summary": "요약 없음", "tags": []}
 
               results.append({
@@ -240,7 +238,7 @@ jobs:
                       )
                   }]
               }],
-              "generationConfig": {"temperature": 0.4}
+              "generationConfig": {"temperature": 0.2}
           }
 
           try:
