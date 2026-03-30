@@ -11,6 +11,8 @@ jobs:
     permissions:
       issues: write
       contents: read
+    env:
+      GEMINI_MODEL: gemini-2.0-flash-001
 
     steps:
       - name: Fetch YouTube videos
@@ -164,7 +166,8 @@ jobs:
 
           def gemini_request(payload):
               import urllib.error
-              url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+              model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash-001")
+              url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
               req = urllib.request.Request(
                   url,
                   data=json.dumps(payload).encode(),
