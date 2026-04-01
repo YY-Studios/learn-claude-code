@@ -237,20 +237,22 @@ export default defineConfig({
       .replace(/\.md$/, ".html")
       .replace(/index\.html$/, "");
 
+    const joinUrl = (...parts) => parts.filter(Boolean).join("/");
+
     pageData.frontmatter.head ??= [];
     pageData.frontmatter.head.push(
-      ["link", { rel: "alternate", hreflang: "ko", href: `${base}/${htmlPath}` }],
-      ["link", { rel: "alternate", hreflang: "en", href: `${base}/en/${htmlPath}` }],
-      ["link", { rel: "alternate", hreflang: "ja", href: `${base}/ja/${htmlPath}` }],
-      ["link", { rel: "alternate", hreflang: "x-default", href: `${base}/${htmlPath}` }]
+      ["link", { rel: "alternate", hreflang: "ko", href: joinUrl(base, htmlPath) }],
+      ["link", { rel: "alternate", hreflang: "en", href: joinUrl(base, "en", htmlPath) }],
+      ["link", { rel: "alternate", hreflang: "ja", href: joinUrl(base, "ja", htmlPath) }],
+      ["link", { rel: "alternate", hreflang: "x-default", href: joinUrl(base, htmlPath) }]
     );
 
     // JSON-LD 구조화 데이터
-    const pageUrl = `${base}/${htmlPath}`;
+    const pageUrl = joinUrl(base, htmlPath);
     const isHome = p === "index.md" || p === "en/index.md" || p === "ja/index.md";
     const lang = p.startsWith("en/") ? "en-US" : p.startsWith("ja/") ? "ja-JP" : "ko-KR";
 
-    if (isHome && p === "index.md") {
+    if (isHome) {
       pageData.frontmatter.head.push([
         "script",
         { type: "application/ld+json" },

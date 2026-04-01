@@ -3,16 +3,16 @@
   "outputDirectory": ".vitepress/dist",
   "headers": [
     {
+      "source": "/:path*",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }]
+    },
+    {
       "source": "/sitemap.xml",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600, must-revalidate" }]
     },
     {
       "source": "/assets/:path*",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
-    },
-    {
-      "source": "/:path*.html",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }]
     }
   ]
 }
