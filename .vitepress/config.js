@@ -13,7 +13,7 @@ const LABEL_MAP = {
     "06-supabase": "06 · 실전 패턴 (Supabase)",
     "07-devlog": "07 · 개발 일지",
     "08-templates": "08 · 템플릿 모음",
-    "09-troubleshooting": "09 · 트러블슈팅",
+    "09-resources": "09 · 커뮤니티 리소스",
   },
   en: {
     "01-getting-started": "01 · Getting Started",
@@ -24,7 +24,8 @@ const LABEL_MAP = {
     "06-supabase": "06 · Practical Patterns (Supabase)",
     "07-devlog": "07 · Dev Log",
     "08-templates": "08 · Templates",
-    "09-troubleshooting": "09 · Troubleshooting",
+    "09-templates": "09 · Templates",
+    "10-resources": "10 · Community Resources",
   },
   ja: {
     "01-getting-started": "01 · はじめに",
@@ -35,7 +36,8 @@ const LABEL_MAP = {
     "06-supabase": "06 · 実践パターン (Supabase)",
     "07-devlog": "07 · 開発ログ",
     "08-templates": "08 · テンプレート集",
-    "09-troubleshooting": "09 · トラブルシューティング",
+    "09-templates": "09 · テンプレート集",
+    "10-resources": "10 · コミュニティリソース",
   },
 };
 
