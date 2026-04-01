@@ -222,6 +222,30 @@ export default defineConfig({
     },
   },
 
+  transformPageData(pageData) {
+    const p = pageData.relativePath;
+    let basePath = p;
+
+    if (p.startsWith("en/")) {
+      basePath = p.slice(3);
+    } else if (p.startsWith("ja/")) {
+      basePath = p.slice(3);
+    }
+
+    const base = "https://learn-claude-code-neon.vercel.app";
+    const htmlPath = basePath
+      .replace(/\.md$/, ".html")
+      .replace(/index\.html$/, "");
+
+    pageData.frontmatter.head ??= [];
+    pageData.frontmatter.head.push(
+      ["link", { rel: "alternate", hreflang: "ko", href: `${base}/${htmlPath}` }],
+      ["link", { rel: "alternate", hreflang: "en", href: `${base}/en/${htmlPath}` }],
+      ["link", { rel: "alternate", hreflang: "ja", href: `${base}/ja/${htmlPath}` }],
+      ["link", { rel: "alternate", hreflang: "x-default", href: `${base}/${htmlPath}` }]
+    );
+  },
+
   ignoreDeadLinks: true,
 
   sitemap: {
