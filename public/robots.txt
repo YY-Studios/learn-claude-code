@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
+Disallow: /.vitepress/
+Disallow: /node_modules/
 
 Sitemap: https://learn-claude-code-neon.vercel.app/sitemap.xml

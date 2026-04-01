@@ -222,6 +222,70 @@ export default defineConfig({
     },
   },
 
+  transformPageData(pageData) {
+    const p = pageData.relativePath;
+    let basePath = p;
+
+    if (p.startsWith("en/")) {
+      basePath = p.slice(3);
+    } else if (p.startsWith("ja/")) {
+      basePath = p.slice(3);
+    }
+
+    const base = "https://learn-claude-code-neon.vercel.app";
+    const htmlPath = basePath
+      .replace(/\.md$/, ".html")
+      .replace(/index\.html$/, "");
+
+    const joinUrl = (...parts) => parts.filter(Boolean).join("/");
+
+    pageData.frontmatter.head ??= [];
+    pageData.frontmatter.head.push(
+      ["link", { rel: "alternate", hreflang: "ko", href: joinUrl(base, htmlPath) }],
+      ["link", { rel: "alternate", hreflang: "en", href: joinUrl(base, "en", htmlPath) }],
+      ["link", { rel: "alternate", hreflang: "ja", href: joinUrl(base, "ja", htmlPath) }],
+      ["link", { rel: "alternate", hreflang: "x-default", href: joinUrl(base, htmlPath) }]
+    );
+
+    // JSON-LD 구조화 데이터
+    const pageUrl = joinUrl(base, htmlPath);
+    const isHome = p === "index.md" || p === "en/index.md" || p === "ja/index.md";
+    const lang = p.startsWith("en/") ? "en-US" : p.startsWith("ja/") ? "ja-JP" : "ko-KR";
+
+    if (isHome) {
+      pageData.frontmatter.head.push([
+        "script",
+        { type: "application/ld+json" },
+        JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "learn claude code",
+          url: base,
+          description: "Claude Code 실전 학습 가이드",
+          inLanguage: ["ko-KR", "en-US", "ja-JP"],
+        }),
+      ]);
+    } else if (!isHome) {
+      pageData.frontmatter.head.push([
+        "script",
+        { type: "application/ld+json" },
+        JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Article",
+          headline: pageData.title || "",
+          description: pageData.description || "",
+          url: pageUrl,
+          inLanguage: lang,
+          publisher: {
+            "@type": "Organization",
+            name: "YY-Studios",
+            url: base,
+          },
+        }),
+      ]);
+    }
+  },
+
   ignoreDeadLinks: true,
 
   sitemap: {
