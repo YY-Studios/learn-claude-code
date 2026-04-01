@@ -244,6 +244,44 @@ export default defineConfig({
       ["link", { rel: "alternate", hreflang: "ja", href: `${base}/ja/${htmlPath}` }],
       ["link", { rel: "alternate", hreflang: "x-default", href: `${base}/${htmlPath}` }]
     );
+
+    // JSON-LD 구조화 데이터
+    const pageUrl = `${base}/${htmlPath}`;
+    const isHome = p === "index.md" || p === "en/index.md" || p === "ja/index.md";
+    const lang = p.startsWith("en/") ? "en-US" : p.startsWith("ja/") ? "ja-JP" : "ko-KR";
+
+    if (isHome && p === "index.md") {
+      pageData.frontmatter.head.push([
+        "script",
+        { type: "application/ld+json" },
+        JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "learn claude code",
+          url: base,
+          description: "Claude Code 실전 학습 가이드",
+          inLanguage: ["ko-KR", "en-US", "ja-JP"],
+        }),
+      ]);
+    } else if (!isHome) {
+      pageData.frontmatter.head.push([
+        "script",
+        { type: "application/ld+json" },
+        JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Article",
+          headline: pageData.title || "",
+          description: pageData.description || "",
+          url: pageUrl,
+          inLanguage: lang,
+          publisher: {
+            "@type": "Organization",
+            name: "YY-Studios",
+            url: base,
+          },
+        }),
+      ]);
+    }
   },
 
   ignoreDeadLinks: true,
