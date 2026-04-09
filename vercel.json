@@ -1,6 +1,7 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": ".vitepress/dist",
+  "cleanUrls": true,
   "redirects": [
     { "source": "/02-context/rules.html", "destination": "/04-claude-control/rules", "permanent": true },
     { "source": "/en/02-context/rules.html", "destination": "/en/04-claude-control/rules", "permanent": true },

@@ -104,6 +104,7 @@ export default defineConfig({
   description:
     "Claude Code 실전 학습 가이드 — 설치부터 Supabase 백엔드리스 프로젝트 적용까지",
   lang: "ko-KR",
+  cleanUrls: true,
 
   // GitHub Pages 배포 시 레포명으로 base 설정
   base: process.env.VERCEL ? "/" : "/learn-claude-code/",
@@ -233,22 +234,22 @@ export default defineConfig({
     }
 
     const base = "https://learn-claude-code-neon.vercel.app";
-    const htmlPath = basePath
-      .replace(/\.md$/, ".html")
-      .replace(/index\.html$/, "");
+    const cleanPath = basePath
+      .replace(/\.md$/, "")
+      .replace(/(\/|^)index$/, "");
 
     const joinUrl = (...parts) => parts.filter(Boolean).join("/");
 
     pageData.frontmatter.head ??= [];
     pageData.frontmatter.head.push(
-      ["link", { rel: "alternate", hreflang: "ko", href: joinUrl(base, htmlPath) }],
-      ["link", { rel: "alternate", hreflang: "en", href: joinUrl(base, "en", htmlPath) }],
-      ["link", { rel: "alternate", hreflang: "ja", href: joinUrl(base, "ja", htmlPath) }],
-      ["link", { rel: "alternate", hreflang: "x-default", href: joinUrl(base, htmlPath) }]
+      ["link", { rel: "alternate", hreflang: "ko", href: joinUrl(base, cleanPath) }],
+      ["link", { rel: "alternate", hreflang: "en", href: joinUrl(base, "en", cleanPath) }],
+      ["link", { rel: "alternate", hreflang: "ja", href: joinUrl(base, "ja", cleanPath) }],
+      ["link", { rel: "alternate", hreflang: "x-default", href: joinUrl(base, cleanPath) }]
     );
 
     // JSON-LD 구조화 데이터
-    const pageUrl = joinUrl(base, htmlPath);
+    const pageUrl = joinUrl(base, cleanPath);
     const isHome = p === "index.md" || p === "en/index.md" || p === "ja/index.md";
     const lang = p.startsWith("en/") ? "en-US" : p.startsWith("ja/") ? "ja-JP" : "ko-KR";
 
