@@ -16,6 +16,7 @@ const LABEL_MAP = {
     "09-supabase": "09 · 실전 패턴 (Supabase)",
     "10-devlog": "10 · 개발 일지",
     "11-templates": "11 · 템플릿 모음",
+    "12-harness": "12 · 하네스 엔지니어링",
   },
   en: {
     "01-getting-started": "01 · Getting Started",
@@ -29,6 +30,7 @@ const LABEL_MAP = {
     "09-supabase": "09 · Practical Patterns (Supabase)",
     "10-devlog": "10 · Dev Log",
     "11-templates": "11 · Templates",
+    "12-harness": "12 · Harness Engineering",
   },
   ja: {
     "01-getting-started": "01 · はじめに",
@@ -42,6 +44,7 @@ const LABEL_MAP = {
     "09-supabase": "09 · 実践パターン (Supabase)",
     "10-devlog": "10 · 開発ログ",
     "11-templates": "11 · テンプレート集",
+    "12-harness": "12 · ハーネスエンジニアリング",
   },
 };
 
