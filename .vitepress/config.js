@@ -294,6 +294,12 @@ export default defineConfig({
 
   sitemap: {
     hostname: "https://learn-claude-code-neon.vercel.app",
+    transformItems(items) {
+      return items.map((item) => ({
+        ...item,
+        url: item.url.replace(/\.html$/, ""),
+      }));
+    },
   },
 
   markdown: {
